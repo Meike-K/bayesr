@@ -3,97 +3,97 @@ simfun <- function(type = "sinus")
 {
   ## Known function types.
   known_types <- c("linear", "quadratic", "unimodal", "double", "sinus",
-    "cosinus", "pick", "complicated", "const", "spatial", "2d",
-    "yue1", "yue2", "yue3")
+                   "cosinus", "pick", "complicated", "const", "spatial", "2d",
+                   "yue1", "yue2", "yue3")
   if(is.character(type))
     type <- match.arg(type, known_types)
-
+  
   f <- switch(type,
-    "linear" = function(x, min = 0, max = 1) {
-      x <- (x - min) / (max - min)
-      f <- -4.5 * x
-      return(f - mean(f))
-    },
-    "quadratic" = function(x, min = 0, max = 1) {
-      x <- (x - min) / (max - min)
-      f <- 3.5 * (x - 0.5)^2
-      return(f - mean(f))
-    },
-    "unimodal" = function(x, min = 0, max = 1) {
-      x <- (x - min) / (max - min)
-      f <- 120 * x * exp(-10 * x)
-      return(f - mean(f))
-    },
-    "double" = function(x, min = 0, max = 1) {
-      x <- (x - min) / (max - min)
-      f <- 1.3 * (120 * x * exp(-10 * x) + 2.75 * x^2)
-      return(f - mean(f))
-    },
-    "sinus" = function(x, min = 0, max = 1) {
-      x <- (x - min) / (max - min)
-      f <- sin(2 * pi * x)
-      return(f - mean(f))
-    },
-    "cosinus" = function(x, min = 0, max = 1) {
-      x <- (x - min) / (max - min)
-      f <- cos(2 * pi * x)
-      return(f - mean(f))
-    },
-    "pick" = function(x, min = 0, max = 1) { 
-      x <- (x - min) / (max - min)
-      f <- sin(2 * (4 * x - 2)) + 2 * exp(-16^2 * (x - 0.5)^2)
-      return(f - mean(f))
-    },
-    "complicated" = function(x, min = 0, max = 1) {
-      x <- (x - min) / (max - min)
-      f <- exp(-400 * (x - 0.6)^2) + 5 * exp(-500 * (x - 0.75)^2) / 3 + 2 * exp(-500 * (x - 0.9)^2)
-      return(f - mean(f))
-    },
-    "const" = function(..., const = 1.2) {
-      const
-    },
-    "spatial" = function(id, f1 = sin, f2 = function(x) sin(x * pi * 2)) {
-      n <- ceiling(sqrt(length(id)))
-      co <- expand.grid("long" = seq(0, 1, length = n), "lat" = seq(0, 1, length = n))
-      f <- f1(co[, 1]) * f2(co[, 2])
-      f <- f - mean(f)
-      f <- data.frame("long" = co[, 1], "lat" = co[, 2], "f" = f)
-      f <- f[seq_along(id), ]
-      return(f)
-    },
-    "2d" = function(x, y) {
-      x <- scale2(x, -3, 3)
-      y <- scale2(y, -3, 3)
-      f <- sin(x) * cos(y)
-      f <- f - mean(f)
-      return(f)
-    },
-    "yue1" = function(x) {
-      x <- scale2(x, 0, 1)
-      knots <- c(0.2, 0.6, 0.7)
-      B <- splineDesign(knots, x, ord = 3, outer.ok = TRUE)
-      f <- B %*% c(20, 4, 6, 11, 6)
-      f <- f - mean(f)
-      return(f)
-    },
-    "yue2" = function(x) {
-      x <- scale2(x, -2, 2)
-      f <- sin(x) + 2 * exp(-30 * x^2)
-      f <- f - mean(f)
-      return(f)
-    },
-    "yue3" = function(x) {
-      x <- scale2(x, 0, 1)
-      e <- 0.125
-      f <- sqrt(x * (1 - x)) * sin(2 * pi * (1 + e) / (x + e))
-      f <- f - mean(f)
-      return(f)
-    }
+              "linear" = function(x, min = 0, max = 1) {
+                x <- (x - min) / (max - min)
+                f <- -4.5 * x
+                return(f - mean(f))
+              },
+              "quadratic" = function(x, min = 0, max = 1) {
+                x <- (x - min) / (max - min)
+                f <- 3.5 * (x - 0.5)^2
+                return(f - mean(f))
+              },
+              "unimodal" = function(x, min = 0, max = 1) {
+                x <- (x - min) / (max - min)
+                f <- 120 * x * exp(-10 * x)
+                return(f - mean(f))
+              },
+              "double" = function(x, min = 0, max = 1) {
+                x <- (x - min) / (max - min)
+                f <- 1.3 * (120 * x * exp(-10 * x) + 2.75 * x^2)
+                return(f - mean(f))
+              },
+              "sinus" = function(x, min = 0, max = 1) {
+                x <- (x - min) / (max - min)
+                f <- sin(2 * pi * x)
+                return(f - mean(f))
+              },
+              "cosinus" = function(x, min = 0, max = 1) {
+                x <- (x - min) / (max - min)
+                f <- cos(2 * pi * x)
+                return(f - mean(f))
+              },
+              "pick" = function(x, min = 0, max = 1) { 
+                x <- (x - min) / (max - min)
+                f <- sin(2 * (4 * x - 2)) + 2 * exp(-16^2 * (x - 0.5)^2)
+                return(f - mean(f))
+              },
+              "complicated" = function(x, min = 0, max = 1) {
+                x <- (x - min) / (max - min)
+                f <- exp(-400 * (x - 0.6)^2) + 5 * exp(-500 * (x - 0.75)^2) / 3 + 2 * exp(-500 * (x - 0.9)^2)
+                return(f - mean(f))
+              },
+              "const" = function(..., const = 1.2) {
+                const
+              },
+              "spatial" = function(id, f1 = sin, f2 = function(x) sin(x * pi * 2)) {
+                n <- ceiling(sqrt(length(id)))
+                co <- expand.grid("long" = seq(0, 1, length = n), "lat" = seq(0, 1, length = n))
+                f <- f1(co[, 1]) * f2(co[, 2])
+                f <- f - mean(f)
+                f <- data.frame("long" = co[, 1], "lat" = co[, 2], "f" = f)
+                f <- f[seq_along(id), ]
+                return(f)
+              },
+              "2d" = function(x, y) {
+                x <- scale2(x, -3, 3)
+                y <- scale2(y, -3, 3)
+                f <- sin(x) * cos(y)
+                f <- f - mean(f)
+                return(f)
+              },
+              "yue1" = function(x) {
+                x <- scale2(x, 0, 1)
+                knots <- c(0.2, 0.6, 0.7)
+                B <- splineDesign(knots, x, ord = 3, outer.ok = TRUE)
+                f <- B %*% c(20, 4, 6, 11, 6)
+                f <- f - mean(f)
+                return(f)
+              },
+              "yue2" = function(x) {
+                x <- scale2(x, -2, 2)
+                f <- sin(x) + 2 * exp(-30 * x^2)
+                f <- f - mean(f)
+                return(f)
+              },
+              "yue3" = function(x) {
+                x <- scale2(x, 0, 1)
+                e <- 0.125
+                f <- sqrt(x * (1 - x)) * sin(2 * pi * (1 + e) / (x + e))
+                f <- f - mean(f)
+                return(f)
+              }
   )
   if(!is.character(type))
     type <- known_types[type]
   attr(f, "type") <- type
-
+  
   f
 }
 
@@ -111,9 +111,9 @@ scale2 <- function(x, lower = -1.5, upper = 1.5)
 GAMart <- function(n = 500, sd = 0.1, seed = FALSE, ti = c("none", "vcm", "main", "both"))
 {
   if(seed) set.seed(111)
-
+  
   ti <- match.arg(ti)
-
+  
   n2 <- ceiling(sqrt(n))
   
   ## Other covariates.
@@ -125,36 +125,36 @@ GAMart <- function(n = 500, sd = 0.1, seed = FALSE, ti = c("none", "vcm", "main"
     "lon" = sample(seq(0, 1, length = n2), size = n, replace = TRUE),
     "lat" = sample(seq(0, 1, length = n2), size = n, replace = TRUE)
   )
-
+  
   i <- match.index(d[, c("lon", "lat")])
   d$id <- as.factor(i$match.index)
-
+  
   ## Functions.
   ## Linear.
   f1 <- function(x) {
     scale2(-1.2 * x, -1, 1)
   }
-
+  
   ## Doublemode.
   f2 <- function(x) {
     scale2(1.3 * (120 * x * exp(-10 * x) + 2.75 * x^2), -1, 1)
   }
-
+  
   ## Quadratic. 
   f3 <- function(x) {
     scale2(3.5 * (x - mean(x))^2, -1, 1)
   }
-
+  
   ## Spatial.
   f4 <- function(lon, lat) {
     scale2(sin(scale2(lon, -3, 3)) * cos(scale2(lat, -3, 3)), -1, 1)
   }
-
+  
   ## Random.
   f5 <- function(id) {
     scale2(rnorm(length(unique(id)), sd = 0.2)[id], -0.2, 0.2)
   }
-
+  
   ## Factor.
   f6 <- function(fac) {
     scale2(sort(rnorm(length(unique(fac)), sd = 1))[fac], -0.5, 0.5)
@@ -181,7 +181,7 @@ GAMart <- function(n = 500, sd = 0.1, seed = FALSE, ti = c("none", "vcm", "main"
   ystar <- d$eta + rnorm(n, sd = 1)
   d$cens <- ifelse(ystar > 0.0, ystar, 0.0)
   d <- d[, c("num", "pnum", "bnum", "cnum", "bin", "cat", "cens", "eta", "x1", "x2", "x3", "fac", "id", "lon", "lat", "err")]
-
+  
   d
 }
 

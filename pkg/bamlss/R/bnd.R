@@ -5,7 +5,7 @@ plot.bnd <- function(x, ...)
   args <- list(...)
   args$map <- x
   do.call("plotmap", args)
-
+  
   return(invisible(NULL))
 }
 

@@ -2,8 +2,8 @@
 ## BayesX interface ##
 ######################
 BayesX.control <- function(n.iter = 1200, thin = 1, burnin = 200,
-  seed = NULL, predict = "light", model.name = "bamlss", data.name = "d",
-  prg.name = NULL, dir = NULL, verbose = FALSE, show.prg = TRUE, modeonly = FALSE, ...)
+                           seed = NULL, predict = "light", model.name = "bamlss", data.name = "d",
+                           prg.name = NULL, dir = NULL, verbose = FALSE, show.prg = TRUE, modeonly = FALSE, ...)
 {
   if(is.null(seed))
     seed <- '##seed##'
@@ -22,7 +22,7 @@ BayesX.control <- function(n.iter = 1200, thin = 1, burnin = 200,
   } else dir <- path.expand(dir)
   if(!file.exists(dir)) dir.create(dir)
   cores <- 1
-
+  
   cvals <- list(
     "prg" = list(
       "iterations" = n.iter, "burnin" = burnin, "step" = thin,
@@ -33,39 +33,39 @@ BayesX.control <- function(n.iter = 1200, thin = 1, burnin = 200,
       "prg.name" = prg.name, "dir" = dir, "verbose" = verbose, "show.prg" = show.prg, "cores" = cores
     )
   )
-
+  
   cvals
 }
 
 
 BayesX <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
-  data = NULL, control = BayesX.control(...), ...)
+                   data = NULL, control = BayesX.control(...), ...)
 {
   stopifnot(requireNamespace("BayesXsrc"))
-
+  
   if(is.null(family$bayesx))
     stop("BayesX specifications missing in family object, cannot set up model!")
-
+  
   if(is.null(attr(x, "bamlss.engine.setup")))
-    x <- bamlss.engine.setup(x, update = update, parametric2smooth = FALSE, nodf = TRUE, ...)
-
+    x <- bamlss.engine.setup(x, update = update, parametric2smooth = FALSE, ...)
+  
   if(!is.null(start))
     x <- set.starting.values(x, start) ## FIXME: starting values for parametric parts?
-
+  
   fbx <- family$bayesx
-
+  
   model.name <- control$setup$model.name
   data.name <- rmf(control$setup$data.name)
   prg.name <- control$setup$prg.name
   dir <- control$setup$dir
   cores <- control$setup$cores
   if(is.null(cores)) cores <- 1
-
+  
   if(!file.exists(dir)) {
     dir.create(dir)
     on.exit(unlink(dir))
   }
-
+  
   if(is.null(data)) {
     data <- try(get('bf', envir = parent.frame())$model.frame, silent = TRUE)
     if(inherits(data, "try-error"))
@@ -73,25 +73,19 @@ BayesX <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
   }
   if(is.null(data))
     stop("no data available for creating BayesX model term objects!")
-
+  
   for(j in names(data)) {
     if(is.factor(data[[j]])) {
       data <- cbind(data, as.data.frame(model.matrix(as.formula(paste("~ -1 +", j)), data = data)))
     }
   }
-
-  if(is.data.frame(y)) {
-    if(ncol(y) < 2) {
-      y <- y[, 1, drop = FALSE]
-    }
-  }
-
+  
   cny <- colnames(y)
   for(j in seq_along(cny))
     cny[j] <- all.vars(as.formula(paste("~", cny[j])))
   colnames(y) <- cny
   yname <- colnames(y)[1]
-
+  
   for(j in names(y)) {
     if(is.factor(y[[j]])) {
       if(nlevels(y[[j]]) < 3) {
@@ -99,7 +93,7 @@ BayesX <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
       }
     }
   }
-
+  
   is.user <- function(x) {
     iu <- inherits(x, "userdefined.smooth.spec") | inherits(x, "tensorX.smooth") | inherits(x, "userdefined.smooth") | inherits(x, "tensor.smooth")
     if(!is.null(x$sx.construct))
@@ -108,14 +102,14 @@ BayesX <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
       iu <- TRUE
     return(iu)
   }
-
+  
   is.tx <- function(x) {
     inherits(x, "tensorX.smooth") | inherits(x, "tensorX3.smooth")
   }
-
+  
   single_eqn <- function(x, y, id) {
     rhs <- dfiles <- prgex <- sdata <- NULL
-
+    
     if(!is.null(x$model.matrix)) {
       cn <- rmf(colnames(x$model.matrix))
       colnames(x$model.matrix) <- cn
@@ -125,14 +119,14 @@ BayesX <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
         sdata <- as.data.frame(x$model.matrix[, cn, drop = FALSE])
       }
       if("Intercept" %in% colnames(x$model.matrix)) {
-        sdata <- cbind("Intercept" = rep(1, if(is.null(dim(y))) length(y) else nrow(y)), sdata)
+        sdata <- cbind("Intercept" = rep(1, nrow(y)), sdata)
         rhs <- c("const", rhs)
       }
     }
-
+    
     if(!is.null(sdata))
       sdata <- as.data.frame(sdata)
-
+    
     if(!is.null(x$smooth.construct)) {
       for(j in names(x$smooth.construct)) {
         if(is.null(x$smooth.construct[[j]]$sx.construct))
@@ -181,44 +175,40 @@ BayesX <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
         }
       }
     }
-
+    
     rn <- response.name(as.formula(x$formula), hierarchical = FALSE)
-
-    if(is.null(family$cat)) {
-      if(rn %in% family$names)
-        rn <- NA
-      if(is.na(rn))
-        rn <- yname
-    }
-
+    if(rn %in% family$names)
+      rn <- NA
+    if(is.na(rn))
+      rn <- yname
     eqn <- paste(rn, "=", paste(rhs, collapse = " + "))
     rval <- list("eqn" = eqn, "prgex" = prgex)
-
+    
     if(!is.null(sdata)) {
       for(j in names(sdata)) {
         if(is.factor(sdata[[j]]))
           sdata[[j]] <- as.integer(as.character(sdata[[j]]))
       }
-      if(nrow(sdata) == (if(is.null(dim(y))) length(y) else nrow(y)))
+      if(nrow(sdata) == nrow(y))
         sdata <- cbind(sdata, y)
       rval$dname <- paste(paste(id, collapse = "_"), data.name, sep = "_")
       write.table(sdata, file = file.path(dir, paste(rval$dname, ".raw", sep = "")),
-        quote = FALSE, row.names = FALSE)
+                  quote = FALSE, row.names = FALSE)
       rval$prgex <- c(
         paste("dataset", rval$dname),
         paste(rval$dname, ".infile using ",
-          file.path(dir, paste(rval$dname, ".raw", sep = "")), sep = ""),
+              file.path(dir, paste(rval$dname, ".raw", sep = "")), sep = ""),
         rval$prgex
       )
     }
-
+    
     rval
   }
-
+  
   eqn <- list()
   prgex <- NULL
   n <- 1
-  main <- if(is.null(family$bayesx$main)) c(TRUE, rep(FALSE, length(x) - 1)) else family$bayesx$main
+  main <- if(is.null(family$main)) c(TRUE, rep(FALSE, length(x) - 1)) else family$main
   pcmd <- control$prg$predict
   control$prg$predict <- NULL
   control$prg$quantile <- family$bayesx$quantile
@@ -226,7 +216,7 @@ BayesX <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
   control$prg$modeonly <- NULL
   if(modeonly)
     control$prg <- control$prg[!(names(control$prg) %in% c("iterations", "burnin", "step"))]
-
+  
   for(i in names(x)) {
     if(!all(c("fake.formula", "formula") %in% names(x[[i]]))) {
       stop("hierarchical models not supported yet!")
@@ -235,15 +225,15 @@ BayesX <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
       for(j in names(x[[i]])) {
         msp <- single_eqn(x[[i]][[j]], y, id = c(i, j))
         teqn <- paste(model.name, ".hregress ", msp$eqn,
-          ", family=", if(k < 2) fbx[[i]][1] else "gaussian_re",
-          " equationtype=", fbx[[i]][2],
-          if(n == length(x) & k < 2) {
-            paste(" ", paste(names(control$prg), "=", control$prg, sep = "", collapse = " "))
-          } else NULL,
-          if(main[n]) {
-            paste(" predict=", pcmd, sep = "")
-          } else NULL,
-          if(!is.null(msp$dname)) paste(" using", msp$dname) else NULL, sep = "")
+                      ", family=", if(k < 2) fbx[[i]][1] else "gaussian_re",
+                      " equationtype=", fbx[[i]][2],
+                      if(n == length(x) & k < 2) {
+                        paste(" ", paste(names(control$prg), "=", control$prg, sep = "", collapse = " "))
+                      } else NULL,
+                      if(main[n]) {
+                        paste(" predict=", pcmd, sep = "")
+                      } else NULL,
+                      if(!is.null(msp$dname)) paste(" using", msp$dname) else NULL, sep = "")
         eqn[[i]][[j]] <- teqn
         prgex <- c(prgex, msp$prgex)
         k <- k + 1
@@ -252,25 +242,25 @@ BayesX <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
     } else {
       msp <- single_eqn(x[[i]], y, id = i)
       teqn <- paste(model.name, ".hregress ", msp$eqn, ", family=", fbx[[i]][1],
-        " equationtype=", if(!main[n]) fbx[[i]][length(fbx[[i]])] else fbx[[i]][2],
-        if(n == length(x)) {
-          paste(paste(" ", paste(names(control$prg), "=", control$prg, sep = "", collapse = " ")),
-            if(modeonly) " modeonly" else "", sep = "")
-        } else NULL,
-        if(main[n]) {
-          if(modeonly) " modeonly" else paste(" predict=", pcmd, sep = "")
-        } else NULL,
-        if(!is.null(msp$dname)) paste(" using", msp$dname) else NULL, sep = "")
+                    " equationtype=", fbx[[i]][2],
+                    if(n == length(x)) {
+                      paste(paste(" ", paste(names(control$prg), "=", control$prg, sep = "", collapse = " ")),
+                            if(modeonly) " modeonly" else "", sep = "")
+                    } else NULL,
+                    if(main[n]) {
+                      if(modeonly) " modeonly" else paste(" predict=", pcmd, sep = "")
+                    } else NULL,
+                    if(!is.null(msp$dname)) paste(" using", msp$dname) else NULL, sep = "")
       eqn[[i]] <- teqn
       prgex <- c(prgex, msp$prgex)
     }
     n <- n + 1
   }
-
+  
   prg <- c(prgex, "", paste("mcmcreg", model.name), "")
   for(i in unlist(rev(eqn)))
     prg <- c(prg, i, "")
-
+  
   if(!modeonly)
     prg <- c(prg, paste(model.name, "getsample", sep = "."))
   prg <- c(
@@ -279,16 +269,16 @@ BayesX <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
     prg
   )
   prg <- unique(prg)
-
+  
   if(any(grepl("##seed##", prg, fixed = TRUE)))
     prg <- gsub("##seed##", round(runif(1L) * .Machine$integer.max), prg, fixed = TRUE)
-
+  
   if(control$setup$show.prg)
     writeLines(prg)
-
+  
   prgf <- file.path(dir, prg.name)
   writeLines(prg, prgf)
-
+  
   warn <- getOption("warn")
   options(warn = -1)
   ok <- BayesXsrc::run.bayesx(prg = prgf, verbose = control$setup$verbose)
@@ -299,20 +289,20 @@ BayesX <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
     errl <- encodeString(errl, width = NA, justify = "left")
     errl <- paste(" *", errl)
     errm <- paste("an error occurred running the BayesX binary! The following messages are returned:\n",
-      paste(errl, collapse = "\n", sep = ""), sep = "")
+                  paste(errl, collapse = "\n", sep = ""), sep = "")
     warning(errm, call. = FALSE)
   }
   if(length(i <- grep("-nan", ok$log, ignore.case = TRUE))) {
     warning("the BayesX engine returned NA samples, please check your model specification! In some cases it can be helpful to center continuous covariates!", call. = FALSE)
   }
-
+  
   sfiles <- grep("_sample.raw", dir(file.path(dir, "output")), fixed = TRUE, value = TRUE)
-
+  
   if(!length(sfiles)) {
     warning("BayesX did not return any samples!")
     return(NULL)
   }
-
+  
   samples <- NULL
   for(i in names(x)) {
     if(!all(c("fake.formula", "formula") %in% names(x[[i]]))) {
@@ -367,7 +357,7 @@ BayesX <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
           if(length(cn) != ncol(samps)) {
             cn <- paste("b", 1:ncol(samps), sep = "")
             warning(paste("number of returned parameters from BayesX is different from number of columns in the design matrix for term ",
-              names(x[[i]]$smooth.construct)[j], "!", sep = ""))
+                          names(x[[i]]$smooth.construct)[j], "!", sep = ""))
           }
           colnames(samps) <- paste(i, ".s.", x[[i]]$smooth.construct[[j]]$label, ".", cn, sep = "")
           sf <- grepl(paste("_", i, "_", sep = ""), sfiles, fixed = TRUE) & grepl(term, sfiles, fixed = TRUE) & grepl("_variance_", sfiles, fixed = TRUE)
@@ -400,13 +390,13 @@ BayesX <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
       }
     }
   }
-
+  
   if(FALSE) {
     sf <- grep("_DIC", dir(file.path(dir, "output")), fixed = TRUE, value = TRUE)
     dic <- read.table(file.path(dir, "output", sf), header = TRUE)[, -1, drop = FALSE]
     samples <- cbind(samples, "DIC" = dic$dic, "pd" = dic$pd)
   }
-
+  
   as.mcmc(samples)
 }
 
@@ -418,7 +408,7 @@ sx <- function(x, z = NULL, bs = "ps", by = NA, ...)
 {
   by <- deparse(substitute(by), backtick = TRUE, width.cutoff = 500)
   call <- match.call()
-
+  
   available.terms <- c(
     "rw1", "rw2",
     "season",
@@ -438,7 +428,7 @@ sx <- function(x, z = NULL, bs = "ps", by = NA, ...)
     "rps", "hrandom_pspline"
   )
   if(!bs %in% available.terms) stop(paste("basis type", sQuote(bs), "not supported by BayesX"))
-
+  
   if(bs %in% c("rsps", "hrandom_pspline")) {
     bs <- "rsps"
     x <- deparse(substitute(x), backtick = TRUE, width.cutoff = 500)
@@ -471,7 +461,7 @@ sx <- function(x, z = NULL, bs = "ps", by = NA, ...)
       }
       options("warn" = warn)
       if(bs %in% c("pspline2dimrw1", "pspline2dimrw2", "te",
-        "gs", "geospline", "kr", "gk", "kriging", "geokriging")) {
+                   "gs", "geospline", "kr", "gk", "kriging", "geokriging")) {
         if(by != "NA")
           stop(paste("by variables are not allowed for smooths of type bs = '", bs, "'!", sep = ""))
       }
@@ -479,7 +469,7 @@ sx <- function(x, z = NULL, bs = "ps", by = NA, ...)
       if(!is.null(xt$knots))
         xt$nrknots <- xt$knots
       if(bs %in% c("ps", "te", "psplinerw1", "psplinerw2", "pspline",
-        "pspline2dimrw2", "pspline2dimrw1", "gs", "geospline")) {
+                   "pspline2dimrw2", "pspline2dimrw1", "gs", "geospline")) {
         if(!is.null(xt$degree))
           m <- xt$degree
         if(!is.null(xt$order)) {
@@ -530,38 +520,14 @@ sx <- function(x, z = NULL, bs = "ps", by = NA, ...)
       rval$term <- term
       rval$dim <- length(term)
       rval$label <- paste("sx(", paste(term, collapse = ",", sep = ""),
-        if(by != "NA") paste(",by=", by, sep = "") else NULL, ")", sep = "")
+                          if(by != "NA") paste(",by=", by, sep = "") else NULL, ")", sep = "")
     }
   }
-
-  if(is.null(rval$xt$prior))
-    rval$xt$prior <- "ig"
-  if(is.null(rval$xt$theta)) {
-    rval$xt$theta <- switch(rval$xt$prior,
-      "sd" = 0.00877812,
-      "hc" = 0.01034553,
-      "hn" = 0.1457644,
-      "u" = 0.2723532
-    )
-  }
-  if(is.null(rval$xt$scaletau2))
-    rval$xt$scaletau2 <- rval$xt$theta
-  if(is.null(rval$xt$hyperprior)) {
-    rval$xt$hyperprior <- switch(rval$xt$prior,
-      "ig" = "invgamma",
-      "hn" = "hnormal",
-      "sd" = "scaledep",
-      "hc" = "hcauchy",
-      "u" = "aunif"
-    )
-  }
-  rval$xt$prior <- NULL
-  rval$xt$theta <- NULL
-
+  
   rval$special <- TRUE
   rval$sx.construct <- TRUE
   class(rval) <- c(class(rval), "no.mgcv")
-
+  
   return(rval)
 }
 
@@ -582,8 +548,8 @@ sx.construct.default <- function(object, data, ...)
     }
   } else info <- paste("of class", paste(sQuote(class(object)), collapse = ", "))
   stop(paste("BayesX does not support smooth terms ", info,
-    ", it is recommended to use sx() for specifying smooth terms",
-    sep = ""))
+             ", it is recommended to use sx() for specifying smooth terms",
+             sep = ""))
 }
 
 do.xt <- function(term, object, not = NULL, noco = FALSE)
@@ -601,7 +567,7 @@ do.xt <- function(term, object, not = NULL, noco = FALSE)
         co <- ","
       if(!name %in% not) {
         if(name %in% c("full", "catspecific", "center", "derivative", "nofixed") || 
-          is.logical(object$xt[[name]])) {
+           is.logical(object$xt[[name]])) {
           if(is.logical(object$xt[[name]])) {
             if(object$xt[[name]])
               term <- paste(term, co, name, sep = "")
@@ -614,44 +580,12 @@ do.xt <- function(term, object, not = NULL, noco = FALSE)
       }
     }
   }
-
+  
   return(term)
 }
 
 sx.construct.userdefined.smooth.spec <- sx.construct.tensorX.smooth <- function(object, data, id = NULL, dir = NULL, ...)
 {
-  if(is.null(object$xt$hyperprior)) {
-    if(is.null(object$xt$prior))
-      object$xt$prior <- "ig"
-  } else {
-    object$xt$prior <- switch(object$xt$hyperprior,
-       "invgamma" = "ig",
-       "hnormal" = "hn",
-       "scaledep" = "sd",
-       "hcauchy" = "hc",
-       "aunif" = "u"
-    )
-  }
-  if(is.null(object$xt$scaletau2)) {
-    if(is.null(object$xt$theta)) {
-      object$xt$theta <- switch(object$xt$prior,
-        "sd" = 0.00877812,
-        "hc" = 0.01034553,
-        "hn" = 0.1457644,
-        "u" = 0.2723532
-      )
-    }
-  } else {
-    object$xt$theta <- object$xt$scaletau2
-  }
-  object$xt$scaletau2 <- object$xt$theta
-  object$xt$hyperprior <- switch(object$xt$prior,
-    "ig" = "invgamma",
-    "hn" = "hnormal",
-    "sd" = "scaledep",
-    "hc" = "hcauchy",
-    "u" = "aunif"
-  )
   object$state <- NULL
   if(!is.null(object$sx.S))
     object$S <- object$sx.S
@@ -707,12 +641,12 @@ sx.construct.userdefined.smooth.spec <- sx.construct.tensorX.smooth <- function(
     Xn <- paste(Xn, "", 1:length(object$S), sep = "")
     for(j in seq_along(object$S)) {
       term <- paste(term, paste("designmatdata", if(j < 2) "" else j, "=", sep = ""),
-        Xn[j], if(j == length(object$S)) { if(noc_and_cm) "," else "" } else ",", sep = "")
+                    Xn[j], if(j == length(object$S)) { if(noc_and_cm) "," else "" } else ",", sep = "")
     }
   } else {
     term <- paste(term, "designmatdata=", Xn,
-      if(noc_and_cm) "," else "",
-      sep = "")
+                  if(noc_and_cm) "," else "",
+                  sep = "")
   }
   if(!is.null(object$C))
     term <- paste(term, "constrmatdata=", Cn, sep = "")
@@ -721,41 +655,41 @@ sx.construct.userdefined.smooth.spec <- sx.construct.tensorX.smooth <- function(
   if(is.null(object$xt$nocenter) & is.null(object$xt$centermethod) & !is.null(object$rank))
     term <- paste(term, ",rankK=", sum(object$rank), sep = "")
   term <- paste(do.xt(term, object,
-    c("center", "before", "penalty", "polys", "map", "map.name", "nb", "gra", "ft", "prior", "theta")), ")", sep = "")
-
+                      c("center", "before", "penalty", "polys", "map", "map.name", "nb", "gra")), ")", sep = "")
+  
   write <- function(dir) {
     exists <- NULL
     for(j in seq_along(object$S)) {
       if(!file.exists(file.path(dir, paste(Sn[j], ".raw", sep = "")))) {
         colnames(object$S[[j]]) <- rownames(object$S[[j]]) <- NULL
         write.table(round(object$S[[j]], 5), file = file.path(dir, paste(Sn[j], ".raw", sep = "")),
-          quote = FALSE, row.names = FALSE)
+                    quote = FALSE, row.names = FALSE)
       } else exists <- c(exists, file.path(dir, paste(Sn[j], ".raw", sep = "")))
     }
     if(is.tx) {
       for(j in seq_along(object$S)) {
         if(!file.exists(file.path(dir, paste(Xn[j], ".raw", sep = "")))) {
           write.table(round(object$margin[[j]]$X, 5), file = file.path(dir, paste(Xn[j], ".raw", sep = "")),
-            quote = FALSE, row.names = FALSE)
+                      quote = FALSE, row.names = FALSE)
         } else exists <- c(exists, file.path(dir, paste(Xn[j], ".raw", sep = "")))
       }
     } else {
       if(!file.exists(file.path(dir, paste(Xn, ".raw", sep = "")))) {
         write.table(round(object$X, 5), file = file.path(dir, paste(Xn, ".raw", sep = "")),
-          quote = FALSE, row.names = FALSE)
+                    quote = FALSE, row.names = FALSE)
       } else exists <- c(exists, file.path(dir, paste(Xn, ".raw", sep = "")))
     }
     if(!is.null(object$C)) {
       if(!file.exists(file.path(dir, paste(Cn, ".raw", sep = "")))) {
         write.table(object$C, file = file.path(dir, paste(Cn, ".raw", sep = "")),
-          quote = FALSE, row.names = FALSE)
+                    quote = FALSE, row.names = FALSE)
       } else exists <- c(exists, file.path(dir, paste(Cn, ".raw", sep = "")))
     }
     if(!is.null(object$state$parameters)) {
       spar <- as.data.frame(matrix(get.par(object$state$parameters, "b"), nrow = 1))
       if(!file.exists(file.path(dir, paste(Pn, ".raw", sep = "")))) {
         write.table(spar, file = file.path(dir, paste(Pn, ".raw", sep = "")),
-          quote = FALSE, row.names = FALSE)
+                    quote = FALSE, row.names = FALSE)
       } else exists <- c(exists, file.path(dir, paste(Pn, ".raw", sep = "")))
     }
     cmd <- NULL
@@ -763,139 +697,139 @@ sx.construct.userdefined.smooth.spec <- sx.construct.tensorX.smooth <- function(
       for(j in seq_along(object$S)) {
         if(!(file.path(dir, paste(Sn[j], ".raw", sep = "")) %in% exists)) {
           cmd <- c(cmd,
-            paste("dataset", Sn[j]),
-            paste(Sn[j], ".infile using ", file.path(dir, paste(Sn[j], ".raw", sep = "")), sep = "")
+                   paste("dataset", Sn[j]),
+                   paste(Sn[j], ".infile using ", file.path(dir, paste(Sn[j], ".raw", sep = "")), sep = "")
           )
         }
         if(!(file.path(dir, paste(Xn[j], ".raw", sep = "")) %in% exists)) {
           cmd <- c(cmd,
-            paste("dataset", Xn[j]),
-            paste(Xn[j], ".infile using ", file.path(dir, paste(Xn[j], ".raw", sep = "")), sep = "")
+                   paste("dataset", Xn[j]),
+                   paste(Xn[j], ".infile using ", file.path(dir, paste(Xn[j], ".raw", sep = "")), sep = "")
           )
         }
       }
     } else {
       if(!(file.path(dir, paste(Sn, ".raw", sep = "")) %in% exists)) {
         cmd <- c(cmd,
-          paste("dataset", Sn),
-          paste(Sn, ".infile using ", file.path(dir, paste(Sn, ".raw", sep = "")), sep = "")
+                 paste("dataset", Sn),
+                 paste(Sn, ".infile using ", file.path(dir, paste(Sn, ".raw", sep = "")), sep = "")
         )
       }
       if(!(file.path(dir, paste(Xn, ".raw", sep = "")) %in% exists)) {
         cmd <- c(cmd,
-          paste("dataset", Xn),
-          paste(Xn, ".infile using ", file.path(dir, paste(Xn, ".raw", sep = "")), sep = "")
+                 paste("dataset", Xn),
+                 paste(Xn, ".infile using ", file.path(dir, paste(Xn, ".raw", sep = "")), sep = "")
         )
       }
     }
     if(!is.null(object$C)) {
       if(!(file.path(dir, paste(Cn, ".raw", sep = "")) %in% exists)) {
         cmd <- c(cmd,
-          paste("dataset", Cn),
-          paste(Cn, ".infile using ", file.path(dir, paste(Cn, ".raw", sep = "")), sep = "")
+                 paste("dataset", Cn),
+                 paste(Cn, ".infile using ", file.path(dir, paste(Cn, ".raw", sep = "")), sep = "")
         )
       }
     }
     if(!is.null(object$state$parameters)) {
       if(!(file.path(dir, paste(Pn, ".raw", sep = "")) %in% exists)) {
         cmd <- c(cmd,
-          paste("dataset", Pn),
-          paste(Pn, ".infile using ", file.path(dir, paste(Pn, ".raw", sep = "")), sep = "")
+                 paste("dataset", Pn),
+                 paste(Pn, ".infile using ", file.path(dir, paste(Pn, ".raw", sep = "")), sep = "")
         )
       }
     }
     return(cmd)
   }
-
+  
   attr(term, "write") <- write
-
+  
   term
 }
 
 sx.construct.pspline.smooth <- sx.construct.ps.smooth.spec <- sx.construct.psplinerw1.smooth.spec <-
-sx.construct.psplinerw2.smooth.spec <- sx.construct.pspline.smooth.spec <-
-function(object, data, mcmcreg = FALSE, ...)
-{
-  if(length(object$p.order) == 1L) 
-    m <- rep(object$p.order, 2L)
-  else 
-    m <- object$p.order
-  m[is.na(m)] <- 2L
-  object$p.order <- m
-  object$p.order[1L] <- object$p.order[1L] + 1L
-  if(inherits(object, "psplinerw1.smooth.spec"))
-    object$p.order[2L] <- 1L
-  if(inherits(object, "psplinerw2.smooth.spec"))
-    object$p.order[2L] <- 2L
-  if(object$bs.dim < 0L)
-    object$bs.dim <- 10L
-  if(length(object$p.order) > 1L) {
-    if(object$p.order[2L] > 2L) {
-      warning("order of the difference penalty not supported by BayesX, set to 2!")
-      object$p.order <- c(object$p.order[1L], 2L)
+  sx.construct.psplinerw2.smooth.spec <- sx.construct.pspline.smooth.spec <-
+  function(object, data, mcmcreg = FALSE, ...)
+  {
+    if(length(object$p.order) == 1L) 
+      m <- rep(object$p.order, 2L)
+    else 
+      m <- object$p.order
+    m[is.na(m)] <- 2L
+    object$p.order <- m
+    object$p.order[1L] <- object$p.order[1L] + 1L
+    if(inherits(object, "psplinerw1.smooth.spec"))
+      object$p.order[2L] <- 1L
+    if(inherits(object, "psplinerw2.smooth.spec"))
+      object$p.order[2L] <- 2L
+    if(object$bs.dim < 0L)
+      object$bs.dim <- 10L
+    if(length(object$p.order) > 1L) {
+      if(object$p.order[2L] > 2L) {
+        warning("order of the difference penalty not supported by BayesX, set to 2!")
+        object$p.order <- c(object$p.order[1L], 2L)
+      }
     }
+    nrknots <- object$bs.dim - object$p.order[1L] + 1L
+    if(nrknots < 5L) {
+      warning("number of inner knots smaller than 5 not supported by BayesX, set to 5!",
+              call. = FALSE)
+      nrknots <- 5L
+    }
+    termo <- object$term
+    term <- if(mcmcreg) {
+      paste(termo, "(pspline,nrknots=",
+            nrknots, ",degree=", object$p.order[1L], ",difforder=", object$p.order[2L], sep = "")
+    } else {
+      paste(termo, "(psplinerw", object$p.order[2L], ",nrknots=",
+            nrknots, ",degree=", object$p.order[1L], sep = "")
+    }
+    object$xt[c("knots", "nrknots", "degree", "difforder")] <- NULL
+    term <- paste(do.xt(term, object, c("center", "before")), ")", sep = "")
+    if(object$by != "NA")
+      term <- make_by(term, object, data)
+    
+    return(term)
   }
-  nrknots <- object$bs.dim - object$p.order[1L] + 1L
-  if(nrknots < 5L) {
-    warning("number of inner knots smaller than 5 not supported by BayesX, set to 5!",
-      call. = FALSE)
-    nrknots <- 5L
-  }
-  termo <- object$term
-  term <- if(mcmcreg) {
-    paste(termo, "(pspline,nrknots=",
-      nrknots, ",degree=", object$p.order[1L], ",difforder=", object$p.order[2L], sep = "")
-  } else {
-    paste(termo, "(psplinerw", object$p.order[2L], ",nrknots=",
-      nrknots, ",degree=", object$p.order[1L], sep = "")
-  }
-  object$xt[c("knots", "nrknots", "degree", "difforder")] <- NULL
-  term <- paste(do.xt(term, object, c("center", "before")), ")", sep = "")
-  if(object$by != "NA")
-    term <- make_by(term, object, data)
-  
-  return(term)
-}
 
 sx.construct.tensor.smooth <- sx.construct.tensor.smooth.spec <- sx.construct.t2.smooth.spec <-
-function(object, dir, prg, data, mcmcreg = FALSE, ...)
-{
-  by <- object$term[1L]
-  term <- object$term[2L]
-  object <- object$margin[[1L]]
-  object$bs.dim <- as.integer(object$bs.dim^2)
-  object$term <- term
-  object$by <- by
-  term <- sx.construct(object, dir, prg, data, mcmcreg = mcmcreg, ...)
-  term <- gsub("(pspline", "(tensor", term, fixed = TRUE)
-  if(!mcmcreg) {
-    term <- gsub("psplinerw2", "pspline2dimrw2", term)
-    term <- gsub("psplinerw1", "pspline2dimrw1", term)
+  function(object, dir, prg, data, mcmcreg = FALSE, ...)
+  {
+    by <- object$term[1L]
+    term <- object$term[2L]
+    object <- object$margin[[1L]]
+    object$bs.dim <- as.integer(object$bs.dim^2)
+    object$term <- term
+    object$by <- by
+    term <- sx.construct(object, dir, prg, data, mcmcreg = mcmcreg, ...)
+    term <- gsub("(pspline", "(tensor", term, fixed = TRUE)
+    if(!mcmcreg) {
+      term <- gsub("psplinerw2", "pspline2dimrw2", term)
+      term <- gsub("psplinerw1", "pspline2dimrw1", term)
+    }
+    return(term)
   }
-  return(term)
-}
 
 sx.construct.ra.smooth.spec <- sx.construct.re.smooth.spec <-
-sx.construct.random.smooth.spec <- sx.construct.random.effect <- function(object, data, mcmcreg = FALSE, ...)
-{
-  term <- object$term
-  if(is.null(object$ins))
-    term <- paste(term, "(random", sep = "")
-  else
-    term <- paste(term, "(hrandom", sep = "")
-  term <- paste(do.xt(term, object, NULL), ")", sep = "")
-  if(object$by != "NA")
-    term <- make_by(term, object, data)
-
-  return(term)
-}
+  sx.construct.random.smooth.spec <- sx.construct.random.effect <- function(object, data, mcmcreg = FALSE, ...)
+  {
+    term <- object$term
+    if(is.null(object$ins))
+      term <- paste(term, "(random", sep = "")
+    else
+      term <- paste(term, "(hrandom", sep = "")
+    term <- paste(do.xt(term, object, NULL), ")", sep = "")
+    if(object$by != "NA")
+      term <- make_by(term, object, data)
+    
+    return(term)
+  }
 
 sx.construct.rps.smooth.spec <- function(object, data, ...)
 {
   term <- paste(object$term, "(hrandom_pspline,centermethod=meansum2", sep = "")
   term <- paste(do.xt(term, object, NULL), ")", sep = "")
   term <- paste(object$by, term , sep = "*")
-
+  
   return(term)
 }
 
@@ -906,7 +840,7 @@ sx.construct.kr.smooth.spec <- sx.construct.kriging.smooth.spec <- function(obje
     stop("kriging method needs two terms!")
   if(object$bs.dim < 0L)
     object$bs.dim <- 10L
-	nrknots <- object$bs.dim
+  nrknots <- object$bs.dim
   xt <- object$xt
   if(is.null(xt$full))
     term <- paste(termo[1L], "*", termo[2L], "(kriging,nrknots=", nrknots, sep = "")
@@ -917,7 +851,7 @@ sx.construct.kr.smooth.spec <- sx.construct.kriging.smooth.spec <- function(obje
   term <- paste(do.xt(term, object, NULL), ")", sep = "")
   if(object$by != "NA")
     term <- make_by(term, object, data)
-
+  
   return(term)
 }
 
@@ -928,7 +862,7 @@ construct.shrw <- function(object, data, what)
   term <- paste(do.xt(term, object, NULL), ")", sep = "")
   if(object$by != "NA")
     term <- make_by(term, object, data)
-
+  
   return(term)
 }
 
@@ -942,13 +876,13 @@ sx.construct.mrf.smooth <- sx.construct.mrf.smooth.spec <- sx.construct.spatial.
   if(is.null(object$xt))
     stop("need to supply a map object in argument xt!")  
   map.name <- help.map.name(deparse(substitute(object, env = .GlobalEnv), 
-    backtick = TRUE, width.cutoff = 500L))
+                                    backtick = TRUE, width.cutoff = 500L))
   if(!is.null(object$xt$map.name))
     map.name <- object$xt$map.name
   if(!is.list(object$xt))
     object$xt <- list(object$xt)
   map.name <- rmf(gsub("\\s", "", paste(map.name, sep = "", collapse = "")))
-
+  
   map <- object$xt$map
   if(is.null(map)) {
     if(!is.null(object$xt$polys))
@@ -983,14 +917,14 @@ sx.construct.mrf.smooth <- sx.construct.mrf.smooth.spec <- sx.construct.spatial.
     else
       class(map) <- "gra"
   }
-
+  
   write <- function(dir = NULL) {
     if(is.null(dir)) {
       dir.create(dir <- tempfile())
       on.exit(unlink(dir))
     } else dir <- path.expand(dir)
     if(!file.exists(dir)) dir.create(dir)
-
+    
     counter <- NULL
     ok <- TRUE
     files <- list.files(dir)
@@ -999,15 +933,15 @@ sx.construct.mrf.smooth <- sx.construct.mrf.smooth.spec <- sx.construct.spatial.
       if(length(classm) > 1L)
         if("list" %in% classm)
           class(map) <- classm[classm != "list"]
-      mapfile <- paste(map.name, counter, ".", class(map), sep = "")[1]
-      if(any(grepl(mapfile, files))) {
-        if(is.null(counter))
-          counter <- 0L
-        counter <- counter + 1L
-      } else ok <- FALSE
+        mapfile <- paste(map.name, counter, ".", class(map), sep = "")[1]
+        if(any(grepl(mapfile, files))) {
+          if(is.null(counter))
+            counter <- 0L
+          counter <- counter + 1L
+        } else ok <- FALSE
     }
     mapfile <- file.path(dir, mapfile)
-
+    
     prg <- paste("map", map.name)
     if(inherits(map, "bnd")) {
       if(!file.exists(mapfile))
@@ -1030,16 +964,16 @@ sx.construct.mrf.smooth <- sx.construct.mrf.smooth.spec <- sx.construct.spatial.
     }
     prg
   }
-
+  
   term <- object$term
   term <- paste(term, "(spatial,map=", map.name, sep = "")
   term <- paste(do.xt(term, object, c("map", "polys", "penalty", "map.name", "nb")), ")", sep = "")
   if(object$by != "NA")
     term <- make_by(term, object, data)
-
+  
   attr(term, "write") <- write
   attr(term, "map.name") <- map.name
-
+  
   return(term)
 }
 
@@ -1058,7 +992,7 @@ make_by <- function(term, object, data)
               term[j] <- gsub(")", ",center)", term[j])
     } else term <- paste(rmf(object$by), "*", term, sep = "")
   } else term <- paste(rmf(object$by), "*", term, sep = "")
-
+  
   return(term)
 }
 
@@ -1066,11 +1000,11 @@ rmf <- function(x)
 {
   for(i in 1L:length(x)) {
     for(char in c("+", "-", "*", ":", "^", "/", " ", "(", ")", "]", "[",
-      ",", ".", "<", ">", "?", "!", "'", "#", "~", "`", ";", "=", "&", "$", "@")) {
+                  ",", ".", "<", ">", "?", "!", "'", "#", "~", "`", ";", "=", "&", "$", "@")) {
       x[i] <- gsub(char, "", x[i], fixed = TRUE)
     }
   }
-
+  
   return(x)
 }
 
@@ -1085,7 +1019,7 @@ help.map.name <- function(x)
     if(is.null(x))
       x <- "map"
   } else  x <- "map"
-
+  
   return(x)
 }
 
@@ -1110,7 +1044,7 @@ sfoofun <- function(x, xt = NULL, ...)
   if(any(grepl("=", rval)))
     rval <- rval[(grep("=", rval) + 2L):length(rval)]
   rval <- resplit(rval)
-   
+  
   return(rval)
 }
 
@@ -1121,14 +1055,14 @@ splitme <- function(x) {
 resplit <- function(x) {
   if(!is.null(x))
     x <- paste(x, sep = "", collapse = "")
-	
+  
   return(x)
 }
 
 
 ## Special tensor constructors.
 te2 <- function (..., k = NA, bs = "cr", m = NA, d = NA, by = NA, fx = FALSE, 
-  mp = TRUE, np = TRUE, xt = NULL, id = NULL, sp = NULL, pc = NULL)
+                 mp = TRUE, np = TRUE, xt = NULL, id = NULL, sp = NULL, pc = NULL) 
 {
   vars <- as.list(substitute(list(...)))[-1]
   dim <- length(vars)
@@ -1137,7 +1071,7 @@ te2 <- function (..., k = NA, bs = "cr", m = NA, d = NA, by = NA, fx = FALSE,
   if(dim > 1) 
     for(i in 2:dim) term[i] <- deparse(vars[[i]], backtick = TRUE)
   for(i in 1:dim) term[i] <- attr(terms(stats::reformulate(term[i])), 
-    "term.labels")
+                                  "term.labels")
   if(sum(is.na(d)) || is.null(d)) {
     n.bases <- dim
     d <- rep(1, dim)
@@ -1214,8 +1148,8 @@ te2 <- function (..., k = NA, bs = "cr", m = NA, d = NA, by = NA, fx = FALSE,
     stxt <- "s("
     for(l in j:j1) stxt <- paste(stxt, term[l], ",", sep = "")
     stxt <- paste(stxt, "k=", deparse(k[i], backtick = TRUE), 
-      ",bs=", deparse(bs[i], backtick = TRUE), ",m=", deparse(m[[i]], 
-        backtick = TRUE), ",xt=xt1", ")")
+                  ",bs=", deparse(bs[i], backtick = TRUE), ",m=", deparse(m[[i]], 
+                                                                          backtick = TRUE), ",xt=xt1", ")")
     margin[[i]] <- eval(parse(text = stxt))
     j <- j1 + 1
   }
@@ -1228,7 +1162,7 @@ te2 <- function (..., k = NA, bs = "cr", m = NA, d = NA, by = NA, fx = FALSE,
   full.call <- paste("te(", term[1], sep = "")
   if(dim > 1) 
     for(i in 2:dim) full.call <- paste(full.call, ",", term[i], 
-      sep = "")
+                                       sep = "")
   label <- paste(full.call, ")", sep = "")
   if(!is.null(id)) {
     if(length(id) > 1) {
@@ -1238,8 +1172,8 @@ te2 <- function (..., k = NA, bs = "cr", m = NA, d = NA, by = NA, fx = FALSE,
     id <- as.character(id)
   }
   ret <- list(margin = margin, term = term, by = by.var, fx = fx, 
-    label = label, dim = dim, mp = mp, np = np, id = id, 
-    sp = sp, inter = FALSE)
+              label = label, dim = dim, mp = mp, np = np, id = id, 
+              sp = sp, inter = FALSE)
   if(!is.null(pc)) {
     if(length(pc) < d) 
       stop("supply a value for each variable for a point constraint")
@@ -1254,9 +1188,9 @@ te2 <- function (..., k = NA, bs = "cr", m = NA, d = NA, by = NA, fx = FALSE,
 }
 
 tx <- function(..., bs = "ps", k = -1,
-  ctr = c("center", "main", "both", "both1", "both2",
-    "none", "meanf", "meanfd", "meansimple", "nullspace"),
-  xt = NULL, special = TRUE)
+               ctr = c("center", "main", "both", "both1", "both2",
+                       "none", "meanf", "meanfd", "meansimple", "nullspace"),
+               special = TRUE)
 {
   if(length(k) < 2) {
     if(k < 0)
@@ -1266,11 +1200,6 @@ tx <- function(..., bs = "ps", k = -1,
   object$constraint <- match.arg(ctr)
   object$label <- gsub("te(", "tx(", object$label, fixed = TRUE)
   object$special <- special
-  object$xt <- xt
-  if(any(i <- sapply(object$margin, class) == "mrf.smooth.spec")) {
-    xt <- c(object$xt, object$margin[[i]]$xt)
-    object$xt <- object$margin[[i]]$xt <- xt
-  }
   class(object) <- "tensorX.smooth.spec"
   object
 }
@@ -1282,7 +1211,7 @@ tx2 <- function(...)
   object
 }
 
-tx3 <- function(..., bs = "ps", k = c(10, 5), ctr = c("main", "center"), xt = NULL, special = TRUE)
+tx3 <- function(..., bs = "ps", k = c(10, 5), ctr = c("main", "center"), special = TRUE)
 {
   vars <- as.character(unlist(as.list(substitute(list(...)))[-1]))
   if(length(vars) != 3L)
@@ -1304,7 +1233,6 @@ tx3 <- function(..., bs = "ps", k = c(10, 5), ctr = c("main", "center"), xt = NU
   object$dim <- 3
   object$special <- special
   object$constraint <- match.arg(ctr)
-  object$xt <- xt
   class(object) <- "tensorX3.smooth.spec"
   object
 }
@@ -1313,29 +1241,29 @@ smooth.construct.tensorX3.smooth.spec <- function(object, data, knots, ...)
 {
   object$margin[[1]] <- smooth.construct.tensorX.smooth.spec(object$margin[[1]], data, knots, ...)
   object$margin[[2]] <- smooth.construct.tensorX.smooth.spec(object$margin[[2]], data, knots, ...)
-
+  
   object$margin[[1]]$S <- object$margin[[1]]$margin[[1]]$S
   object$margin[[2]]$X <- tensor.prod.model.matrix(list(object$margin[[2]]$margin[[1]]$X, object$margin[[2]]$margin[[2]]$X))
   object$margin[[2]]$S <- list(
     kronecker(diag(1, ncol(object$margin[[2]]$margin[[1]]$S[[1]])), object$margin[[2]]$margin[[1]]$S[[1]]) +
-    kronecker(object$margin[[2]]$margin[[2]]$S[[1]], diag(1, ncol(object$margin[[2]]$margin[[2]]$S[[1]])))
+      kronecker(object$margin[[2]]$margin[[2]]$S[[1]], diag(1, ncol(object$margin[[2]]$margin[[2]]$S[[1]])))
   )
   object$X <- tensor.prod.model.matrix(list(object$margin[[1]]$X, object$margin[[2]]$X))
   object$S <- tensor.prod.penalties(list(object$margin[[1]]$S[[1]], object$margin[[2]]$S[[1]]))
-
+  
   p1 <- ncol(object$margin[[1]]$X)
   p2 <- ncol(object$margin[[2]]$X)
-
+  
   if(object$constraint == "main") {
     A1 <- matrix(rep(1, p1), ncol = 1)
     A2 <- matrix(rep(1, p2), ncol = 1)
     I1 <- diag(p1); I2 <- diag(p2)
-
+    
     A <- cbind(kronecker(A1, I2), kronecker(I1,A2))
-
+    
     i <- match.index(t(A))
     A <- A[, i$nodups, drop = FALSE]
-
+    
     k <- 0
     while((qr(A)$rank < ncol(A)) & (k < 100)) {
       i <- sapply(1:ncol(A), function(d) { qr(A[, -d])$rank })
@@ -1346,92 +1274,31 @@ smooth.construct.tensorX3.smooth.spec <- function(object, data, knots, ...)
     }
     if(k == 100)
       stop("rank problems with constraint matrix!")
-
+    
     object$C <- t(A)
   } else {
     object$C <- matrix(1, ncol = p1 * p2)
   }
-
-  if(is.null(object$xt$hyperprior)) {
-    if(is.null(object$xt$prior))
-      object$xt$prior <- "ig"
-  } else {
-    object$xt$prior <- switch(object$xt$hyperprior,
-       "invgamma" = "ig",
-       "hnormal" = "hn",
-       "scaledep" = "sd",
-       "hcauchy" = "hc",
-       "aunif" = "u"
-    )
-  }
-  if(is.null(object$xt$scaletau2)) {
-    if(is.null(object$xt$theta)) {
-      object$xt$theta <- switch(object$xt$prior,
-        "sd" = 0.00877812,
-        "hc" = 0.01034553,
-        "hn" = 0.1457644,
-        "u" = 0.2723532
-      )
-    }
-  } else {
-    object$xt$theta <- object$xt$scaletau2
-  }
-  object$xt$scaletau2 <- object$xt$theta
-  object$xt$hyperprior <- switch(object$xt$prior,
-    "ig" = "invgamma",
-    "hn" = "hnormal",
-    "sd" = "scaledep",
-    "hc" = "hcauchy",
-    "u" = "aunif"
-  )
-
-  if(!is.null(object$xt[["ft"]])) {
-    if(object$xt[["ft"]]) {
-      stopifnot(requireNamespace("sdPrior"))
-      if(length(object$margin) > 1) {
-        nraniso <- if(is.null(object$xt$nraniso)) 11 else object$xt$nraniso
-        minaniso <- if(is.null(object$xt$minaniso)) 0.05 else object$xt$minaniso
-        omegaseq <- seq(from = minaniso, to = 1 - minaniso, length = nraniso)
-        omegaseq[5] <- 0.4099
-        omegaprob <- rep(1 / nraniso, nraniso)
-        object$xt$theta <- try(sdPrior::hyperpar_mod(object$X, object$margin[[1]]$S[[1]], object$margin[[2]]$S[[1]], A = object$C, c = 3,
-          alpha = 0.1, omegaseq = omegaseq, omegaprob = omegaprob, R = 1000,
-          type = toupper(object$xt$prior,lowrank=if(ncol(object$X) > 100) TRUE else FALSE,
-          k = min(c(50, ceiling(0.5 * ncol(object$X)))))), silent = TRUE)
-      } else {
-        object$xt$theta <- try(sdPrior::hyperpar_mod(object$X, object$S[[1]], NULL, A = object$C, c = 3,
-          alpha = 0.1, omegaseq = 1, omegaprob = 1, R = 1000, type = toupper(object$xt$prior),
-          lowrank=if(ncol(object$X) > 100) TRUE else FALSE,
-          k = min(c(50, ceiling(0.5 * ncol(object$X))))), silent = TRUE)
-      }
-      if(inherits(object$xt$theta, "try-error")) {
-        print(object$xt$theta)
-        print(object$label)
-        stop("problems with sdPrior!")
-      }
-      object$xt$scaletau2 <- object$xt$theta
-    }
-  }
-
+  
   attr(object$C, "always.apply") <- TRUE
-
+  
   object$tx.term <- paste(object$term, collapse = "")
   object$sx.S <- lapply(object$margin, function(x) { x$S[[1]] })
   object$sx.rank <- qr(do.call("+", object$S))$rank
   if(!(object$constraint %in% c("center", "meanf", "meanfd", "meansimple", "none", "nullspace")))
     object$sx.rank <- object$sx.rank - nrow(object$C)
   object$side.constrain <- if(object$special) FALSE else TRUE
-
+  
   class(object) <- "tensorX3.smooth"
-
+  
   object
 }
 
 Predict.matrix.tensorX3.smooth <- function(object, data) 
 {
   tensor.prod.model.matrix(list(Predict.matrix(object$margin[[1]], data),
-    Predict.matrix(object$margin[[2]]$margin[[1]], data),
-    Predict.matrix(object$margin[[2]]$margin[[2]], data)))
+                                Predict.matrix(object$margin[[2]]$margin[[1]], data),
+                                Predict.matrix(object$margin[[2]]$margin[[2]], data)))
 }
 
 
@@ -1439,9 +1306,9 @@ smooth.construct.tensorX.smooth.spec <- function(object, data, knots, ...)
 {
   if(length(object$margin) > 2)
     stop("more than two variables in tx() currently not supported!")
-
+  
   side.constrain <- if(object$special) FALSE else TRUE
-
+  
   object$np <- FALSE
   object$by.done <- TRUE
   if(is.null(object$inter))
@@ -1450,24 +1317,24 @@ smooth.construct.tensorX.smooth.spec <- function(object, data, knots, ...)
   if(object$mp)
     object$sx.S <- lapply(object$margin, function(x) { x$S[[1]] })
   object$sx.rank <- qr(do.call("+", object$S))$rank
-
+  
   if(object$by != "NA")
     object$label <- paste(object$label, object$by, sep = ":")
-
+  
   object$side.constrain <- side.constrain
-
+  
   ref <- sapply(object$margin, function(x) { inherits(x, "random.effect") })
-
+  
   if(length(ref) < 2) {
     if(ref)
       object$constraint <- "center"
   }
-
+  
   if(length(object$margin) > 1) {
     if(!object$mp)
       object$constraint <- "none"
   }
-
+  
   if(object$constraint %in% c("meanf", "meanfd", "meansimple", "none", "nullspace")) {
     if(object$constraint == "none")
       object$xt$nocenter <- TRUE
@@ -1483,7 +1350,7 @@ smooth.construct.tensorX.smooth.spec <- function(object, data, knots, ...)
     } else {
       p1 <- ncol(object$margin[[2]]$X); p2 <- ncol(object$margin[[1]]$X)
       I1 <- diag(p1); I2 <- diag(p2)
-
+      
       if(object$constraint == "center") {
         object$C <- matrix(1, ncol = p1 * p2)
       } else {
@@ -1507,17 +1374,17 @@ smooth.construct.tensorX.smooth.spec <- function(object, data, knots, ...)
           A1 <- cbind(rep(1, p1), 1:p1)
           A2 <- matrix(rep(1, p2), ncol = 1)
         }
-
+        
         if(ref[1])
           A1 <- matrix(rep(1, p1), ncol = 1)
         if(ref[2])
           A2 <- matrix(rep(1, p2), ncol = 1)
-
+        
         A <- cbind(kronecker(A1, I2), kronecker(I1,A2))
-
+        
         i <- match.index(t(A))
         A <- A[, i$nodups, drop = FALSE]
-
+        
         k <- 0
         while((qr(A)$rank < ncol(A)) & (k < 100)) {
           i <- sapply(1:ncol(A), function(d) { qr(A[, -d])$rank })
@@ -1528,87 +1395,27 @@ smooth.construct.tensorX.smooth.spec <- function(object, data, knots, ...)
         }
         if(k == 100)
           stop("rank problems with constraint matrix!")
-
+        
         object$C <- t(A)
       }
     }
   }
-
+  
   if(length(object$margin) > 1) {
     object$tx.term <- paste(unlist(lapply(object$margin, function(x) {
       paste(x$term, collapse = "")
     })), collapse = "")
   }
-
+  
   if(object$by != "NA") {
     object$X <- data[[object$by]] * object$X
   }
-
-  if(is.null(object$xt$hyperprior)) {
-    if(is.null(object$xt$prior))
-      object$xt$prior <- "ig"
-  } else {
-    object$xt$prior <- switch(object$xt$hyperprior,
-       "invgamma" = "ig",
-       "hnormal" = "hn",
-       "scaledep" = "sd",
-       "hcauchy" = "hc",
-       "aunif" = "u"
-    )
-  }
-  if(is.null(object$xt$scaletau2)) {
-    if(is.null(object$xt$theta)) {
-      object$xt$theta <- switch(object$xt$prior,
-        "sd" = 0.00877812,
-        "hc" = 0.01034553,
-        "hn" = 0.1457644,
-        "u" = 0.2723532
-      )
-    }
-  } else {
-    object$xt$theta <- object$xt$scaletau2
-  }
-  object$xt$scaletau2 <- object$xt$theta
-  object$xt$hyperprior <- switch(object$xt$prior,
-    "ig" = "invgamma",
-    "hn" = "hnormal",
-    "sd" = "scaledep",
-    "hc" = "hcauchy",
-    "u" = "aunif"
-  )
-
-  if(!is.null(object$xt[["ft"]])) {
-    if(object$xt[["ft"]]) {
-      stopifnot(requireNamespace("sdPrior"))
-      if(length(object$margin) > 1) {
-        nraniso <- if(is.null(object$xt$nraniso)) 11 else object$xt$nraniso
-        minaniso <- if(is.null(object$xt$minaniso)) 0.05 else object$xt$minaniso
-        omegaseq <- seq(from = minaniso, to = 1 - minaniso, length = nraniso)
-        omegaseq[5] <- 0.4099
-        omegaprob <- rep(1 / nraniso, nraniso)
-
-        object$xt$theta <- try(sdPrior::hyperpar_mod(unique(object$X), object$margin[[1]]$S[[1]], object$margin[[2]]$S[[1]], A = object$C, c = 3,
-          alpha = 0.1, omegaseq = omegaseq, omegaprob = omegaprob, R = 1000, type = toupper(object$xt$prior),
-          lowrank=if(ncol(object$X) > 100) TRUE else FALSE, k = min(c(50, ceiling(0.5 * ncol(object$X))))), silent = TRUE)
-      } else {
-        object$xt$theta <- try(sdPrior::hyperpar_mod(unique(object$X), object$S[[1]], NULL, A = object$C, c = 3,
-          alpha = 0.1, omegaseq = 1, omegaprob = 1, R = 1000, type = toupper(object$xt$prior),
-          lowrank=if(ncol(object$X) > 100) TRUE else FALSE, k = min(c(50, ceiling(0.5 * ncol(object$X))))), silent = TRUE)
-      }
-      if(inherits(object$xt$theta, "try-error")) {
-        print(object$xt$theta)
-        print(object$label)
-        stop("problems with sdPrior!")
-      }
-      object$xt$scaletau2 <- object$xt$theta
-    }
-  }
-
+  
   if(!is.null(object$C))
     attr(object$C, "always.apply") <- TRUE
   
   class(object) <- "tensorX.smooth"
-
+  
   if(length(object$margin) > 1) {
     if(!(object$constraint %in% c("center", "meanf", "meanfd", "meansimple", "none", "nullspace")))
       object$sx.rank <- object$sx.rank - nrow(object$C)
@@ -1616,7 +1423,7 @@ smooth.construct.tensorX.smooth.spec <- function(object, data, knots, ...)
       class(object) <- "tensor.smooth"
     }
   }
-
+  
   return(object)
 }
 
@@ -1635,7 +1442,7 @@ get_BayesXsrc <- function(dir = NULL, install = TRUE) {
   }
   setwd(dir)
   system("svn checkout svn://scm.r-forge.r-project.org/svnroot/bayesr/pkg/BayesXsrc BayesXsrc")
-
+  
   devel <- c(
     'REPOS=http://svn.gwdg.de/svn/bayesx/trunk',
     'USER=guest',
@@ -1654,9 +1461,9 @@ get_BayesXsrc <- function(dir = NULL, install = TRUE) {
     'cp dev-Makefile Makefile',
     'cp dev-Makefile.win Makefile.win'
   )
-
+  
   writeLines(devel, file.path("BayesXsrc", "bootstrap-devel.sh"))
-
+  
   sh <- c(
     'cd BayesXsrc',
     'sh ./bootstrap-devel.sh',
@@ -1664,12 +1471,11 @@ get_BayesXsrc <- function(dir = NULL, install = TRUE) {
     'R CMD build BayesXsrc',
     if(install) 'R CMD INSTALL BayesXsrc_*.tar.gz' else NULL
   )
-
+  
   writeLines(sh, "get_BayesXsrc.sh")
   ok <- system('sh ./get_BayesXsrc.sh')
-
+  
   setwd(owd)
   return(ok)
 }
-
 

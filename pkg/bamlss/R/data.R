@@ -5,7 +5,7 @@ save_data <- function(..., file, envir = parent.frame())
   dir.create(tdir <- tempfile())
   on.exit(unlink(tdir))
   bf <- basename(file)
- 
+  
   compress <- c("gzip", "bzip2", "xz")
   size <- NULL
   for(j in compress) {
@@ -13,9 +13,9 @@ save_data <- function(..., file, envir = parent.frame())
     save(..., file = tf, compress = j, envir = envir)
     size <- c(size, file.info(tf)$size)
   }
-
+  
   print(data.frame("compress" = compress, "size" = size))
-
+  
   compress <- compress[which.min(size)]
   save(..., file = file, compress = compress, envir = envir)
 }
@@ -27,7 +27,7 @@ data_MunichRent <- function(dir = NULL)
   if(is.null(dir))
     dir <- "~/svn/bayesr/pkg/bamlss/data"
   dir <- path.expand(dir)
-
+  
   dpath <- "http://www.stat.uni-muenchen.de/~kneib/regressionsbuch/download/mietspiegel99.raw"
   dat <- read.table(dpath, header = TRUE)
   rent99 <- list()
@@ -46,20 +46,20 @@ data_MunichRent <- function(dir = NULL)
   levels(rent99$cheating) <- c("no", "yes")
   rent99 <- as.data.frame(rent99)
   rent99 <- rent99[order(rent99$district), ]
-
+  
   nenv <- new.env()
   assign("rent99", rent99, envir = nenv)
   save_data(rent99, file = file.path(dir, "rent99.rda"), envir = nenv)
-
+  
   dpath <- "http://www.stat.uni-muenchen.de/~kneib/regressionsbuch/download/muenchen.bnd"
   MunichBnd <- BayesX::read.bnd(dpath)
   nm <- names(MunichBnd)
   MunichBnd <- MunichBnd[nm[order(as.integer(nm))]]
   attr(MunichBnd, "asp") <- 1.1
-
+  
   assign("MunichBnd", MunichBnd, envir = nenv)
   save_data(MunichBnd, file = file.path(dir, "MunichBnd.rda"), envir = nenv)
-
+  
   invisible(NULL)
 }
 
@@ -70,7 +70,7 @@ data_Patent <- function(dir = NULL)
   if(is.null(dir))
     dir <- "~/svn/bayesr/pkg/bamlss/data"
   dir <- path.expand(dir)
-
+  
   dpath <- "http://www.stat.uni-muenchen.de/~kneib/regressionsbuch/download/patentdata.raw"
   dat <- read.table(dpath, header = TRUE)
   patent <- list()
@@ -84,11 +84,11 @@ data_Patent <- function(dir = NULL)
   patent$ncountry <- as.integer(dat$ncountry)
   patent$nclaims <- as.integer(dat$nclaims)
   patent <- as.data.frame(patent)
-
+  
   nenv <- new.env()
   assign("patent", patent, envir = nenv)
   save_data(patent, file = file.path(dir, "patent.rda"), envir = nenv)
-
+  
   invisible(NULL)
 }
 
@@ -101,18 +101,18 @@ data_Germany <- function(dir = NULL)
   dir <- path.expand(dir)
   dir.create(tf <- tempfile())
   on.exit(unlink(tf))
-
+  
   download.file("http://biogeo.ucdavis.edu/data/gadm2/shp/DEU_adm.zip",
-    zf <- file.path(tf, "germany.zip"))
+                zf <- file.path(tf, "germany.zip"))
   unzip(zf, exdir = gsub("\\.zip$", "", zf))
-
+  
   g <- maptools::readShapePoly(file.path(tf, "germany", "DEU_adm3.shp"))
   rn <- as.character(d$NAME_3)
   Encoding(rn) <- "latin1"
   GermanyBnd <- BayesX::sp2bnd(g, regionNames = rn)
   d <- slot(g, "data")
   d <- data.frame("name" = as.character(d$NAME_3), "id" = as.character(d$ID_3),
-    stringsAsFactors = FALSE)
+                  stringsAsFactors = FALSE)
   Encoding(d$name) <- "latin1"
   i <- which(!(d$id %in% names(GermanyBnd)))
   not <- d[i, ]
@@ -126,10 +126,10 @@ data_Germany <- function(dir = NULL)
   for(j in 1:nrow(ok)) {
     ng2 <- c(ng2, unique(ok$name[ok$id == ng[j]]))
   }
-
+  
   names(GermanyBnd) <- ng2
   attr(GermanyBnd, "asp") <- 1.6
-
+  
   invisible(NULL)
 }
 
