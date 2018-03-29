@@ -509,8 +509,8 @@ SEXP block_inverse(SEXP X, SEXP IND, SEXP DIAGONAL)
             }
           }
 
-          F77_CALL(dpotrf)("Upper", &ni, Xiptr, &ni, &info);
-          F77_CALL(dpotri)("Upper", &ni, Xiptr, &ni, &info);
+          F77_CALL(dpotrf)("U", &ni, Xiptr, &ni, &info);
+          F77_CALL(dpotri)("U", &ni, Xiptr, &ni, &info);
 
           for(j = 0; j < ni; j++) {
             for(jj = j; jj < ni; jj++) {
@@ -3223,17 +3223,24 @@ SEXP rho_score_mvnorm(SEXP Y, SEXP PAR, SEXP N, SEXP K, SEXP MJ, SEXP SJ, SEXP R
 
 
 /* Boosting updater. */
-SEXP boost_fit(SEXP x, SEXP y, SEXP nu, SEXP rho)
+SEXP boost_fit(SEXP x, SEXP y, SEXP nu, SEXP W, SEXP rho)
 {
   int i, j, k;
   int nProtected = 0;
-  int n          = length(y);
-  int fixed      = LOGICAL(getListElement(x, "fixed"))[0];
+  int n = length(y);
+  int fixed = LOGICAL(getListElement(x, "fixed"))[0];
 
-  SEXP state       = PROTECT(duplicate(getListElement(x, "state")));
+  SEXP state = PROTECT(duplicate(getListElement(x, "state")));
   ++nProtected;
   double *thetaptr = REAL(getListElement(state, "parameters"));
   int *penFun = INTEGER(getListElement(x, "penaltyFunction"));
+
+  int nW = length(W);
+  if(nW > 1) {
+    if(nW != n)
+      nW = 1;
+  }
+  double *Wptr = REAL(W);
 
   /* Reto: changes */
   /* This was the main change: Reto 2017-01-24 */
@@ -3260,19 +3267,19 @@ SEXP boost_fit(SEXP x, SEXP y, SEXP nu, SEXP rho)
   /* More pointers needed. */
   double *eptr = REAL(y);
   double *xweightsptr = REAL(getListElement(x, "weights"));
-  double *xrresptr    = REAL(getListElement(x, "rres"));
-  double *XWptr       = REAL(getListElement(x, "XW"));
-  double *XWXptr      = REAL(getListElement(x, "XWX"));
-  double *Xptr        = REAL(PROTECT(VECTOR_ELT(x, X_ind))); ++nProtected;
+  double *xrresptr = REAL(getListElement(x, "rres"));
+  double *XWptr = REAL(getListElement(x, "XW"));
+  double *XWXptr = REAL(getListElement(x, "XWX"));
+  double *Xptr = REAL(PROTECT(VECTOR_ELT(x, X_ind))); ++nProtected;
   /* Reto: changes, setting empty pointer to 0 */
   double *Sptr = 0;
-  int    *idptr       = INTEGER(getListElement(getListElement(x, "binning"), "match.index"));
-  int    *indptr      = INTEGER(getListElement(getListElement(x, "binning"), "sorted.index"));
-  int    *orderptr    = INTEGER(getListElement(getListElement(x, "binning"), "order"));
+  int    *idptr = INTEGER(getListElement(getListElement(x, "binning"), "match.index"));
+  int    *indptr = INTEGER(getListElement(getListElement(x, "binning"), "sorted.index"));
+  int    *orderptr = INTEGER(getListElement(getListElement(x, "binning"), "order"));
 
   /* Handling fitted.values. */
   double *fitrptr = REAL(getListElement(x, "fit.reduced"));
-  double *fitptr  = REAL(getListElement(state, "fitted.values"));
+  double *fitptr = REAL(getListElement(state, "fitted.values"));
 
   /* Start. */
   xweightsptr[0] = 0.0;
@@ -3288,12 +3295,17 @@ SEXP boost_fit(SEXP x, SEXP y, SEXP nu, SEXP rho)
       }
       ++j;
       xweightsptr[j] = 0.0;
-      xrresptr[j]    = 0.0;
+      xrresptr[j] = 0.0;
     }
     k = orderptr[i] - 1;
 
-    xweightsptr[j] += 1.0;
-    xrresptr[j] += eptr[k];
+    if(nW > 0) {
+      xweightsptr[j] += Wptr[k];
+      xrresptr[j] += eptr[k] * Wptr[k];
+    } else {
+      xweightsptr[j] += 1.0;
+      xrresptr[j] += eptr[k];
+    }
   }
 
   for(jj = 0; jj < nc; jj++) {
@@ -3389,7 +3401,11 @@ SEXP boost_fit(SEXP x, SEXP y, SEXP nu, SEXP rho)
   for(i = 0; i < n; i++) {
     k = idptr[i] - 1;
     fitptr[i] = fitrptr[k];
-    rss += pow(fitptr[i] - yptr[i], 2.0);
+    if(nW > 0) {
+      rss += (pow(fitptr[i] - yptr[i], 2.0) * Wptr[i]);
+    } else {
+      rss += pow(fitptr[i] - yptr[i], 2.0);
+    }
   }
   REAL(getListElement(state, "rss"))[0] = rss;
 
@@ -3751,31 +3767,38 @@ SEXP rho_score_mvnormAR1(SEXP Y, SEXP PAR, SEXP N, SEXP K, SEXP MJ, SEXP SJ, SEX
 }
 
 /* Neural net fit fun. */
-/*SEXP nnet_fitun(SEXP X, SEXP b, SEXP nid)*/
-/*{*/
-/*  int i, j, jj, n = nrows(X);*/
-/*  int k = ncols(X);*/
-/*  int nodes = length(nid);*/
+SEXP nnet_fitfun(SEXP X, SEXP b, SEXP NODES)
+{
+  int i, j, jj, n = nrows(X);
+  int k = ncols(X);
+  int nodes = INTEGER(NODES)[0];
 
-/*  double *Xptr = REAL(X);*/
-/*  double *bptr = REAL(b);*/
+  double *Xptr = REAL(X);
+  double *bptr = REAL(b);
 
-/*  SEXP fit;*/
-/*  PROTECT(fit = allocVector(REALSXP, n));*/
-/*  double *fitptr = REAL(fit);*/
+  SEXP fit;
+  PROTECT(fit = allocVector(REALSXP, n));
+  double *fitptr = REAL(fit);
 
-/*  double ftmp = 0.0;*/
+  int l = 0;
+  double ftmp = 0.0;
 
-/*  for(j = 0; j < nodes; j++) {*/
-/*    id = INTEGER*/
-/*    for(i = 0; i < n; i++) {*/
-/*      ftmp = 0.0;*/
-/*      for(jj = 0; jj < k; jj++) {*/
-/*        ftmp += Xptr[i + jj * n] * bptr[]*/
-/*      }*/
-/*    }*/
-/*  }*/
-/*}*/
+  for(i = 0; i < n; i++) {
+    fitptr[i] = 0.0;
+    for(j = 0; j < nodes; j++) {
+      ftmp = 0.0;
+      l = 0;
+      for(jj = (j * (k + 1) + 1); jj < (j * (k + 1) + k + 1); jj++) {
+        ftmp += Xptr[i + l * n] * bptr[jj];
+        l = l + 1;
+      }
+      fitptr[i] += bptr[j * (k + 1)] / (1.0 + exp(-ftmp));
+    }
+  }
+
+  UNPROTECT(1);
+  return(fit);
+}
 
 /*    fit <- 0*/
 /*    for(j in seq_along(nid)) {*/
@@ -3787,6 +3810,145 @@ SEXP rho_score_mvnormAR1(SEXP Y, SEXP PAR, SEXP N, SEXP K, SEXP MJ, SEXP SJ, SEX
 /*    fit <- fit - mean(fit, na.rm = TRUE)*/
 
 
+/* Fast hat-matrix trace. */
+SEXP hatmat_trace(SEXP H0, SEXP H1)
+{
+  int i, j, n = nrows(H1);
+  double *h0ptr = REAL(H0);
+  double *h1ptr = REAL(H1);
+  double sum1 = 0.0;
+  double sum2 = 0.0;
+  for(i = 0; i < n; i++) {
+    for(j = 0; j < n; j++) {
+      sum2 += h0ptr[i + n * j] * h1ptr[j + n * i];
+    }
+    sum1 += h0ptr[i + n * i];
+  }
+  SEXP trace;
+  PROTECT(trace = allocVector(REALSXP, 1));
+  REAL(trace)[0] = n - sum1 + sum2;
+  UNPROTECT(1);
+  return trace;
+}
+
+SEXP hatmat_sumdiag(SEXP H)
+{
+  int i, n = nrows(H);
+  double *hptr = REAL(H);
+  double sum = 0.0;
+  for(i = 0; i < n; i++) {
+    sum += (1.0 - hptr[i + n * i]);
+  }
+  SEXP trace;
+  PROTECT(trace = allocVector(REALSXP, 1));
+  REAL(trace)[0] = sum;
+  UNPROTECT(1);
+  return trace;
+}
 
 
+SEXP boost_fit_nnet(SEXP nu, SEXP X, SEXP N, SEXP y, SEXP ind)
+{
+  int i, j;
+  int n = nrows(X);
+  int k = ncols(X);
 
+  SEXP g;
+  PROTECT(g = allocVector(REALSXP, k));
+
+  SEXP fit;
+  PROTECT(fit = allocMatrix(REALSXP, n, k));
+
+  SEXP rss;
+  PROTECT(rss = allocVector(REALSXP, k));
+
+  double *Xptr = REAL(X);
+  double *Nptr = REAL(N);
+  double *yptr = REAL(y);
+  int *indptr = INTEGER(ind);
+  double *gptr = REAL(g);
+  double *fitptr = REAL(fit);
+  double *rssptr = REAL(rss);
+
+  double nu2 = REAL(nu)[0];
+
+  for(j = 0; j < k; j++) {
+    gptr[j] = 0.0;
+    rssptr[j] = 0.0;
+    for(i = 0; i < n; i++) {
+      gptr[j] += Nptr[(indptr[i] - 1) + n * j] * yptr[i];
+    }
+    gptr[j] = nu2 * gptr[j];
+    for(i = 0; i < n; i++) {
+      fitptr[i + n * j] = Xptr[(indptr[i] - 1) + n * j] * gptr[j];
+      rssptr[j] += pow(fitptr[i + n * j] - yptr[i], 2.0);
+    }
+  }
+
+  SEXP rval;
+  PROTECT(rval = allocVector(VECSXP, 3));
+
+  SEXP nrval;
+  PROTECT(nrval = allocVector(STRSXP, 3));
+
+  SET_VECTOR_ELT(rval, 0, g);
+  SET_VECTOR_ELT(rval, 1, fit);
+  SET_VECTOR_ELT(rval, 2, rss);
+
+  SET_STRING_ELT(nrval, 0, mkChar("g"));
+  SET_STRING_ELT(nrval, 1, mkChar("fit"));
+  SET_STRING_ELT(nrval, 2, mkChar("rss"));
+        
+  setAttrib(rval, R_NamesSymbol, nrval);
+
+  UNPROTECT(5);
+
+  return rval;
+}
+
+/*SEXP nnet_boost_mmult(X, g)*/
+/*{*/
+/*  n = nrows(X), k = ncols(X);*/
+/*  int i,j;*/
+
+/*  SEXP fit;*/
+/*  PROTECT(fit = allocMatrix(REALSXP, n, k));*/
+
+/*  double *xptr = REAL(X);*/
+/*  double *yptr = REAL(y);*/
+/*  double *gptr = REAL(g);*/
+/*  double *fitptr = REAL(fit);*/
+
+/*  double sum = 0.0;*/
+/*  double nu2 = REAL(nu)[0]*/
+
+/*  for(j = 0; j < k; j++) {*/
+/*    for(i = 0; i < n; i++) {*/
+/*      sum += xptr[i + n * j] * yptr[i]*/
+/*    }*/
+/*    gptr[j] = nu2 * sum;*/
+/*    for(i = 0; i < n; i++) {*/
+/*      fitptr[i + n * j] = xptr[i + n * j] * gptr[j]*/
+/*      */
+/*    }*/
+/*  }*/
+
+/*  SEXP rval;*/
+/*  PROTECT(rval = allocVector(VECSXP, 2));*/
+/*  ++nProtected;*/
+
+/*  SEXP nrval;*/
+/*  PROTECT(nrval = allocVector(STRSXP, 2));*/
+/*  ++nProtected;*/
+
+/*  SET_VECTOR_ELT(rval, 0, grad);*/
+/*  SET_VECTOR_ELT(rval, 1, hess);*/
+
+/*  SET_STRING_ELT(nrval, 0, mkChar("grad"));*/
+/*  SET_STRING_ELT(nrval, 1, mkChar("hess"));*/
+/*        */
+/*  setAttrib(rval, R_NamesSymbol, nrval); */
+
+/*  UNPROTECT(nProtected);*/
+/*  return rval;*/
+/*}*/

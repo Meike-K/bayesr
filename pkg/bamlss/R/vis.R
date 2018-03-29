@@ -1,8 +1,8 @@
 plot2d <- function(x, residuals = FALSE, rug = FALSE, jitter = TRUE, 
-                   col.residuals = NULL, col.lines = NULL, col.polygons = NULL, 
-                   col.rug = NULL, c.select = NULL, fill.select = NULL, data = NULL,
-                   sep = "", month = NULL, year = NULL, step = 12,
-                   shift = NULL, trans = NULL, scheme = 1, s2.col = NULL, grid = 50, ...)
+  col.residuals = NULL, col.lines = NULL, col.polygons = NULL, 
+  col.rug = NULL, c.select = NULL, fill.select = NULL, data = NULL,
+  sep = "", month = NULL, year = NULL, step = 12,
+  shift = NULL, trans = NULL, scheme = 1, s2.col = NULL, grid = 50, ...)
 {
   rugp <- attr(x, "rug")
   if(is.null(x))
@@ -21,13 +21,13 @@ plot2d <- function(x, residuals = FALSE, rug = FALSE, jitter = TRUE,
     else
       if(is.matrix(data))
         data <- as.data.frame(data)
-      if(any(grep("+", as.character(x)[2L]))) {
-        xch <- as.character(x)
-        x <- model.frame(as.formula(paste("~", xch[2L])), data = data)
-        x <- cbind(model.frame(as.formula(paste("~", xch[3L])), data = data), x)
-      } else x <- model.frame(x, data = data)
-      if(ncol(x) < 2L)
-        stop("formula is specified wrong!")
+    if(any(grep("+", as.character(x)[2L]))) {
+      xch <- as.character(x)
+      x <- model.frame(as.formula(paste("~", xch[2L])), data = data)
+      x <- cbind(model.frame(as.formula(paste("~", xch[3L])), data = data), x)
+    } else x <- model.frame(x, data = data)
+    if(ncol(x) < 2L)
+      stop("formula is specified wrong!")
   }
   is.bayesx <- grepl(".bayesx", class(x))[1L]
   if(is.data.frame(x)) {
@@ -96,7 +96,7 @@ plot2d <- function(x, residuals = FALSE, rug = FALSE, jitter = TRUE,
   }	
   if(is.character(c.select)) 
     c.select <- pmatch(c.select, colnames(x))
-  x <- x[, c.select]
+  x <- x[, c.select, drop = FALSE]
   if(!is.null(shift)) {
     shift <- as.numeric(shift[1])
     x[, 2:ncol(x)] <- x[, 2:ncol(x)] + shift
@@ -122,7 +122,7 @@ plot2d <- function(x, residuals = FALSE, rug = FALSE, jitter = TRUE,
     args$xlim <- base::range(x[,1L], na.rm = TRUE)
   if(!(!is.null(args$add) && args$add)) {
     graphics::plot(args$xlim, args$ylim, type = "n", axes = FALSE, 
-                   xlab = args$xlab, ylab = args$ylab, main = args$main)
+      xlab = args$xlab, ylab = args$ylab, main = args$main)
   }
   args <- set.plot2d.specs(ncol(x) - 1L, args, col.lines, is.bayesx)
   args$rugp <- rugp
@@ -153,8 +153,8 @@ plot2d <- function(x, residuals = FALSE, rug = FALSE, jitter = TRUE,
       label <- (pos - pos[1]) / step + year
       if(nrow(x) <= 24) {
         label2 <- month.abb[ifelse(step == 12, 1:12,
-                                   ifelse(step == 4, c(1, 4, 7, 10),
-                                          ifelse(step == 2, c(1, 7), FALSE)))]
+          ifelse(step == 4, c(1, 4, 7, 10),
+          ifelse(step == 2, c(1, 7), FALSE)))]
         label2 <- rep(label2, length.out = nrow(x) + month - 1)
         label2 <- label2[month:(nrow(x) + month - 1)]
         start2 <- x[1, 1]
@@ -169,14 +169,14 @@ plot2d <- function(x, residuals = FALSE, rug = FALSE, jitter = TRUE,
       axis(1L, cex.axis = args$cex.axis)
     }
   }
-  
+
   return(invisible(NULL))
 }
 
 
 plot2d.default <- function(x, residuals, range, col.residuals = "black",
-                           fill.select = NULL, col.polygons = NULL, col.rug = NULL, pb = FALSE, 
-                           x.co = NULL, rug = FALSE, jitter = FALSE, specs)
+  fill.select = NULL, col.polygons = NULL, col.rug = NULL, pb = FALSE, 
+  x.co = NULL, rug = FALSE, jitter = FALSE, specs)
 {
   if(residuals && !is.null(pres <- attr(x, "residuals")))
     residuals <- TRUE
@@ -205,7 +205,7 @@ plot2d.default <- function(x, residuals, range, col.residuals = "black",
     x <- cbind(x.co, ux)
     x <- rbind(x, x, x)
   }
-  x <- x[order(x[,1L]),]
+  x <- x[order(x[,1L]), , drop = FALSE]
   if(!is.null(fill.select)) {      
     ufs <- unique(fill.select)
     ufs <- ufs[ufs != 0]
@@ -233,17 +233,17 @@ plot2d.default <- function(x, residuals, range, col.residuals = "black",
     for(k in 1L:nu) {
       check <- fill.select == ufs[k]
       if(length(check) == ncol(x)) {
-        poly <- x[, check]
+        poly <- x[, check, drop = FALSE]
         if(specs$scheme == 1) {
-          p1 <- poly[, 1L]
-          p2 <- poly[, 2L]
+          p1 <- poly[, 1L, drop = FALSE]
+          p2 <- poly[, 2L, drop = FALSE]
           y.co <- c(p1, p2[length(p2):1L])
           x.co <- x[,1L]
           x.co <- c(x.co, x.co[length(x.co):1L])
           graphics::polygon(x = x.co, y = y.co, col = col.polygons[k], 
-                            lty = specs$poly.lty[k], border = specs$border[k], 
-                            density = specs$density[k], angle = specs$angle[k], 
-                            lwd = specs$poly.lwd[k])
+            lty = specs$poly.lty[k], border = specs$border[k], 
+            density = specs$density[k], angle = specs$angle[k], 
+            lwd = specs$poly.lwd[k])
         } else {
           grid <- if(is.null(specs$grid)) 30 else specs$grid
           mx <- grep("50%", colnames(x), fixed = TRUE)
@@ -272,9 +272,9 @@ plot2d.default <- function(x, residuals, range, col.residuals = "black",
             x.co <- x[,1L]
             x.co <- c(x.co, x.co[length(x.co):1L])
             graphics::polygon(x = x.co, y = y.co, col = specs$s2.col[pj], 
-                              lty = specs$poly.lty[k], border = specs$border[k], 
-                              density = specs$density[k], angle = specs$angle[k], 
-                              lwd = specs$poly.lwd[k])
+              lty = specs$poly.lty[k], border = specs$border[k], 
+              density = specs$density[k], angle = specs$angle[k], 
+              lwd = specs$poly.lwd[k])
           }
         }
       }
@@ -292,7 +292,7 @@ plot2d.default <- function(x, residuals, range, col.residuals = "black",
   }
   for(k in 2L:ncol(x)) {
     lines(x[,k] ~ x[,1L], lty = specs$lty[k - 1L], lwd = specs$lwd[k - 1L], 
-          col = specs$col.lines[k - 1L])
+      col = specs$col.lines[k - 1L])
   }
   if(rug) {
     specs$col <- col.rug
@@ -303,19 +303,19 @@ plot2d.default <- function(x, residuals, range, col.residuals = "black",
       specs$x <- rugp
     do.call(graphics::rug, delete.args(graphics::rug, specs))
   }
-  
+
   return(invisible(NULL))
 }
 
 
 plot3d <- function(x, residuals = FALSE, col.surface = NULL, 
-                   ncol = 99L, swap = FALSE, col.residuals = NULL, col.contour = NULL, 
-                   c.select = NULL, grid = 30L, image = FALSE, contour = FALSE, 
-                   legend = TRUE, cex.legend = 1, breaks = NULL, range = NULL, 
-                   digits = 2L, d.persp = 1L, r.persp = sqrt(3), 
-                   outscale = 0, data = NULL, sep = "",
-                   shift = NULL, trans = NULL,
-                   type = "mba", linear = FALSE, extrap = FALSE, k = 40, ...)
+  ncol = 99L, swap = FALSE, col.residuals = NULL, col.contour = NULL, 
+  c.select = NULL, grid = 30L, image = FALSE, contour = FALSE, 
+  legend = TRUE, cex.legend = 1, breaks = NULL, range = NULL, 
+  digits = 2L, d.persp = 1L, r.persp = sqrt(3), 
+  outscale = 0, data = NULL, sep = "",
+  shift = NULL, trans = NULL,
+  type = "mba", linear = FALSE, extrap = FALSE, k = 40, ...)
 {
   if(is.null(x))
     return(invisible(NULL))
@@ -333,13 +333,13 @@ plot3d <- function(x, residuals = FALSE, col.surface = NULL,
     else
       if(is.matrix(data))
         data <- as.data.frame(data)
-      x <- model.frame(x, data = data)
-      if(ncol(x) < 3L)
-        stop("formula is specified wrong!")
-      if(ncol(x) > 3L)
-        x <- x[, c(2L, 3L, 1L, 4L:ncol(x))]
-      else
-        x <- x[, c(2L, 3L, 1L)]
+    x <- model.frame(x, data = data)
+    if(ncol(x) < 3L)
+      stop("formula is specified wrong!")
+    if(ncol(x) > 3L)
+      x <- x[, c(2L, 3L, 1L, 4L:ncol(x))]
+    else
+      x <- x[, c(2L, 3L, 1L)]
   }
   if(is.data.frame(x)) {
     if(!is.na(match("intnr", names(x))) & !is.null(c.select) & !is.character(c.select))
@@ -396,7 +396,7 @@ plot3d <- function(x, residuals = FALSE, col.surface = NULL,
     }
     if(is.se) {
       take2 <- c("mean", "Mean", "MEAN", "estimate", 
-                 "Estimate", "ESTIMATE", "mean", "pmode")
+        "Estimate", "ESTIMATE", "mean", "pmode")
       for(k in take2)
         if(any(nx %in% k))
           take <- c(take[1], id[nx %in% k][1], take[2])
@@ -418,12 +418,12 @@ plot3d <- function(x, residuals = FALSE, col.surface = NULL,
       stop("argument c.select is specified wrong!")
     for(k in 1:length(take)) {
       fitted[[k]] <- interp2(X, z, x[, take[k]], xo = xn, yo = zn,
-                             type = type, linear = linear, extrap = extrap, k = k)
+        type = type, linear = linear, extrap = extrap, k = k)
     }
   }
   if(length(fitted[[1L]]) == 1L && is.na(fitted[[1L]][1L])) {
     fitted[[1L]] <- interp2(X, z, x[, 3L], xo = xn, yo = zn,
-                            type = type, linear = linear, extrap = extrap, k = k)
+      type = type, linear = linear, extrap = extrap, k = k)
   }
   if(!is.null(range)) {
     for(k in 1L:length(fitted)) {
@@ -435,7 +435,7 @@ plot3d <- function(x, residuals = FALSE, col.surface = NULL,
   }
   if(!is.null(shift)) {
     for(k in 1L:length(fitted)) {
-      fitted[[k]] <- fitted[[k]] + shift
+        fitted[[k]] <- fitted[[k]] + shift
     }
   }
   if(!is.null(trans)) {
@@ -472,8 +472,8 @@ plot3d <- function(x, residuals = FALSE, col.surface = NULL,
     myfit <- matrix(fitted[[1L]], grid, grid)
     if(length(fitted) < 2L) {
       args$col <- make_pal(col = col.surface, ncol = ncol, data = myfit, 
-                           range = range, breaks = breaks, swap = swap, 
-                           symmetric = args$symmetric)$map(myfit)
+        range = range, breaks = breaks, swap = swap, 
+        symmetric = args$symmetric)$map(myfit)
     } else args$col <- col.surface
     args$z <- substitute(myfit)
     args$d <- d.persp
@@ -500,7 +500,7 @@ plot3d <- function(x, residuals = FALSE, col.surface = NULL,
       args$col <- color[1L]
       args$border <- bcol[1L]
       pmat <- pmat0 <- do.call(graphics::persp, 
-                               delete.args("persp.default", args, c("lwd", "lty"), package = "graphics"))
+        delete.args("persp.default", args, c("lwd", "lty"), package = "graphics"))
       for(k in 2L:length(fitted)) {
         par(new = TRUE)
         args$col <- color[k]
@@ -513,11 +513,11 @@ plot3d <- function(x, residuals = FALSE, col.surface = NULL,
         myfit <- matrix(fitted[[k]], grid, grid)
         args$z <- substitute(myfit)
         pmat <- do.call(graphics::persp, 
-                        delete.args("persp.default", args, c("lwd", "lty"), package = "graphics"))
+          delete.args("persp.default", args, c("lwd", "lty"), package = "graphics"))
       }
     } else {
       pmat <- pmat0 <- do.call(graphics::persp, delete.args("persp.default",
-                                                            args, c("lwd", "lty"), package = "graphics"))
+        args, c("lwd", "lty"), package = "graphics"))
     }
     if(residuals && !is.null(e)) {
       t3d <- trans3d(e[,1L], e[,2L], e[,3L], pmat)
@@ -529,8 +529,8 @@ plot3d <- function(x, residuals = FALSE, col.surface = NULL,
   if(image || contour) {
     myfit <- matrix(fitted[[1L]], grid[1L], grid[1L])
     pal <- make_pal(col = col.surface, ncol = ncol, data = myfit, 
-                    range = range, breaks = breaks, swap = swap, 
-                    symmetric = args$symmetric)
+      range = range, breaks = breaks, swap = swap, 
+      symmetric = args$symmetric)
     args$col <- pal$colors
     args$breaks <- pal$breaks
     if(is.null(args$xlim))
@@ -553,17 +553,17 @@ plot3d <- function(x, residuals = FALSE, col.surface = NULL,
         layout(matrix(c(1, 2), nrow = 1), widths = c(1, lcm(w)))
       }
       do.call(graphics::image, 
-              delete.args(graphics::image.default, args, 
-                          c("xlab", "ylab", "main", "axes")))
+        delete.args(graphics::image.default, args, 
+        c("xlab", "ylab", "main", "axes")))
       if(!is.null(args$image.map)) {
-        args2 <- args
-        args2$map <- args$image.map
-        args2$add <- TRUE
-        args2$legend <- FALSE
-        args2$x <- NULL
-        args2$id <- NULL
-        args2$col <- NULL
-        do.call(plotmap, delete.args(plotmap, args2))
+          args2 <- args
+          args2$map <- args$image.map
+          args2$add <- TRUE
+          args2$legend <- FALSE
+          args2$x <- NULL
+          args2$id <- NULL
+          args2$col <- NULL
+          do.call(plotmap, delete.args(plotmap, args2))
       }
       if(contour) {
         if(is.null(col.contour)) 
@@ -572,8 +572,8 @@ plot3d <- function(x, residuals = FALSE, col.surface = NULL,
           args$col <- col.contour
         args$add <- TRUE
         do.call(graphics::contour.default, 
-                delete.args(graphics::contour.default, args, 
-                            c("xlab", "ylab", "main", "axes")))
+          delete.args(graphics::contour.default, args, 
+          c("xlab", "ylab", "main", "axes")))
         contour <- FALSE
       }
       if(legend) {
@@ -621,21 +621,21 @@ plot3d <- function(x, residuals = FALSE, col.surface = NULL,
       else
         args$col <- col.contour
       do.call(graphics::contour.default, 
-              delete.args(graphics::contour.default, args, 
-                          c("xlab", "ylab", "main", "axes")))
+        delete.args(graphics::contour.default, args, 
+        c("xlab", "ylab", "main", "axes")))
     }
     args$pal <- pal
   }
   args$pmat <- pmat0
-  
+
   return(invisible(args))
 }
 
 
 plotblock <- function(x, residuals = FALSE, range = c(0.3, 0.3), 
-                      col.residuals = "black", col.lines = "black", c.select = NULL, 
-                      fill.select = NULL , col.polygons = NULL, data = NULL,
-                      shift = NULL, trans = NULL, labels = NULL, ...)
+  col.residuals = "black", col.lines = "black", c.select = NULL, 
+  fill.select = NULL , col.polygons = NULL, data = NULL,
+  shift = NULL, trans = NULL, labels = NULL, ...)
 {
   if(is.null(x))
     return(invisible(NULL))
@@ -645,13 +645,13 @@ plotblock <- function(x, residuals = FALSE, range = c(0.3, 0.3),
     else
       if(is.matrix(data))
         data <- as.data.frame(data)
-      if(any(grep("+", as.character(x)[2]))) {
-        xch <- as.character(x)
-        x <- model.frame(as.formula(paste("~", xch[2L])), data = data)
-        x <- cbind(model.frame(as.formula(paste("~", xch[3L])), data = data), x)
-      } else x <- model.frame(x, data = data)
-      if(ncol(x) < 2L)
-        stop("formula is specified wrong!")
+    if(any(grep("+", as.character(x)[2]))) {
+      xch <- as.character(x)
+      x <- model.frame(as.formula(paste("~", xch[2L])), data = data)
+      x <- cbind(model.frame(as.formula(paste("~", xch[3L])), data = data), x)
+    } else x <- model.frame(x, data = data)
+    if(ncol(x) < 2L)
+      stop("formula is specified wrong!")
   }
   is.bayesx <- grepl(".bayesx", class(x))[1L]
   if(is.data.frame(x)) {
@@ -792,7 +792,7 @@ plotblock <- function(x, residuals = FALSE, range = c(0.3, 0.3),
   if(!is.null(args$add) && args$add)
     par(new = TRUE)
   graphics::plot(args$xlim, args$ylim, type = "n", axes = FALSE, 
-                 xlab = args$xlab, ylab = args$ylab, main = args$main)
+    xlab = args$xlab, ylab = args$ylab, main = args$main)
   args <- set.plot2d.specs(ncol(x[[1L]]) - 1L, args, col.lines, is.bayesx)
   xnames <- NULL
   axn <- rep(NA, n)
@@ -831,19 +831,19 @@ plotblock <- function(x, residuals = FALSE, range = c(0.3, 0.3),
       axis(2L)
       axis(1L, at = 1L:n, labels = axn)
     }
-  
+
   return(invisible(NULL))
 }
 
 
 colorlegend <- function(color = NULL, ncol = NULL, x = NULL, breaks = NULL, 
-                        pos = "center", shift = 0.02, side.legend = 1L, side.ticks = 1L, range = NULL, lrange = NULL, 
-                        width = 0.25, height = 0.05, scale = TRUE, xlim = NULL, ylim = NULL, plot = NULL, full = FALSE,
-                        add = FALSE, col.border = "black", lty.border = 1L, lwd.border = 1L, ticks = TRUE, 
-                        at = NULL, col.ticks = "black", lwd.ticks = 1L, lty.ticks = 1L, length.ticks = 0.3, 
-                        labels = NULL, distance.labels = 0, col.labels = "black", cex.labels = 1L, 
-                        digits = 2L, swap = FALSE, symmetric = TRUE, xpd = NULL,
-                        title = NULL, side.title = 2, shift.title = c(0, 0), cex.title = 1, ...)
+  pos = "center", shift = 0.02, side.legend = 1L, side.ticks = 1L, range = NULL, lrange = NULL, 
+  width = 0.25, height = 0.05, scale = TRUE, xlim = NULL, ylim = NULL, plot = NULL, full = FALSE,
+  add = FALSE, col.border = "black", lty.border = 1L, lwd.border = 1L, ticks = TRUE, 
+  at = NULL, col.ticks = "black", lwd.ticks = 1L, lty.ticks = 1L, length.ticks = 0.3, 
+  labels = NULL, distance.labels = 0, col.labels = "black", cex.labels = 1L, 
+  digits = 2L, swap = FALSE, symmetric = TRUE, xpd = NULL,
+  title = NULL, side.title = 2, shift.title = c(0, 0), cex.title = 1, ...)
 {
   args <- list(...)
   if(is.null(xlim)) {
@@ -878,7 +878,7 @@ colorlegend <- function(color = NULL, ncol = NULL, x = NULL, breaks = NULL,
   if(is.null(plot) || plot == TRUE) {
     plot <- TRUE
     graphics::plot.default(xlim, ylim, type = "n", xlab = "", ylab = "", 
-                           axes = FALSE, xlim = xlim, ylim = ylim, asp = NA)
+      axes = FALSE, xlim = xlim, ylim = ylim, asp = NA)
   } else plot <- FALSE
   if(is.null(xpd))
     xpd <- FALSE
@@ -886,7 +886,7 @@ colorlegend <- function(color = NULL, ncol = NULL, x = NULL, breaks = NULL,
     par(xpd = xpd)
   pos2 <- NULL
   postxt <- c("bottomleft", "topleft", "topright", "bottomright",
-              "left", "right", "top", "bottom", "center")
+    "left", "right", "top", "bottom", "center")
   poscheck <- pmatch(pos, postxt)
   if(all(!is.na(poscheck)) && length(poscheck) > 0) {
     pos2 <- postxt[pmatch(pos, postxt)]
@@ -899,7 +899,7 @@ colorlegend <- function(color = NULL, ncol = NULL, x = NULL, breaks = NULL,
   }
   limits <- list(xlim, ylim)
   pos <- opos <- c(min(limits[[1L]], na.rm = TRUE) + pos[1L] * diff(limits[[1L]]), 
-                   min(limits[[2L]], na.rm = TRUE) + pos[2L] * diff(limits[[2L]])) 
+    min(limits[[2L]], na.rm = TRUE) + pos[2L] * diff(limits[[2L]])) 
   if(side.legend > 1L)
     limits <- rev(limits)
   if(scale) {
@@ -961,13 +961,13 @@ colorlegend <- function(color = NULL, ncol = NULL, x = NULL, breaks = NULL,
     obs2legend <- function(x, xr) ((x - lrange[1L]) / diff(lrange)) * diff(xr) + xr[1L]
     if(side.legend < 2L) {
       graphics::rect(obs2legend(head(br, -1L), xlim), ylim[1L], obs2legend(tail(br, -1L), xlim),
-                     ylim[2L], col = cl, border = cl, xpd = xpd, lwd = 0.01)
+        ylim[2L], col = cl, border = cl, xpd = xpd, lwd = 0.01)
     } else {
       graphics::rect(xlim[1L], obs2legend(head(br, -1L), ylim), xlim[2L], 
-                     obs2legend(tail(br, -1L), ylim), col = cl, border = cl, xpd = xpd, lwd = 0.01)
+        obs2legend(tail(br, -1L), ylim), col = cl, border = cl, xpd = xpd, lwd = 0.01)
     }
     graphics::rect(xlim[1L], ylim[1L], xlim[2L], ylim[2L], 
-                   border = col.border, lwd = lwd.border, lty = lty.border, xpd = xpd)
+      border = col.border, lwd = lwd.border, lty = lty.border, xpd = xpd)
     dl <- TRUE
     if(!is.null(labels) && labels == FALSE)
       dl <- FALSE
@@ -1015,21 +1015,21 @@ colorlegend <- function(color = NULL, ncol = NULL, x = NULL, breaks = NULL,
           if(side.legend < 2L) {
             if(ticks) {
               graphics::lines(c(at[i], at[i]), c(ylim[side.ticks], ylim[side.ticks] - length.ticks),
-                              lwd = lwd.ticks[i], lty = lty.ticks[i], col = col.ticks[i])
+                lwd = lwd.ticks[i], lty = lty.ticks[i], col = col.ticks[i])
             }
             if(dl) {
               graphics::text(at[i], ylim[side.ticks] - length.ticks - (distance.labels * length.ticks * 2),
-                             labels = labels[i], col = col.labels[i], cex = cex.labels[i], pos = 1, ...)
+                labels = labels[i], col = col.labels[i], cex = cex.labels[i], pos = 1, ...)
             }
           } else {
             if(ticks) {
               graphics::lines(c(xlim[side.ticks], xlim[side.ticks] - length.ticks), c(at[i], at[i]),
-                              lwd = lwd.ticks[i], lty = lty.ticks[i], col = col.ticks[i]) 
+                lwd = lwd.ticks[i], lty = lty.ticks[i], col = col.ticks[i]) 
             }
             if(dl) {
               graphics::text(xlim[side.ticks] - length.ticks - (distance.labels * length.ticks * 2), 
-                             at[i], labels = labels[i], col = col.labels[i], cex = cex.labels[i],
-                             pos = if(side.ticks < 2L) 2 else 4, ...)
+                at[i], labels = labels[i], col = col.labels[i], cex = cex.labels[i],
+                pos = if(side.ticks < 2L) 2 else 4, ...)
             }
           }
         }
@@ -1039,9 +1039,9 @@ colorlegend <- function(color = NULL, ncol = NULL, x = NULL, breaks = NULL,
         } else {
           if(side.ticks < 2L) where <- 2L else where <- 4L
         }
-        axis(where, at = at, labels = labels, col = col.labels, 
-             tick = ticks, lty = lty.ticks, col.ticks = col.ticks, 
-             lwd.ticks = lwd.ticks, cex.axis = cex.labels[1])
+      axis(where, at = at, labels = labels, col = col.labels, 
+        tick = ticks, lty = lty.ticks, col.ticks = col.ticks, 
+        lwd.ticks = lwd.ticks, cex.axis = cex.labels[1])
       }
     }
     if(!is.null(title)) {
@@ -1051,20 +1051,20 @@ colorlegend <- function(color = NULL, ncol = NULL, x = NULL, breaks = NULL,
         xp <- xlim[1L] + shift.title[1] * diff(range(xlim)) + diff(range(xlim)) / 2
         yp <- ylim[2L] + shift.title[2] * diff(range(ylim))
         text(if(side.legend < 2) xp else yp,
-             if(side.legend < 2) yp else xp, title, pos = 3,
-             srt = if(side.legend == 2) 270 else 0, cex = cex.title, xpd = xpd)
+          if(side.legend < 2) yp else xp, title, pos = 3,
+          srt = if(side.legend == 2) 270 else 0, cex = cex.title, xpd = xpd)
       } else {
         mtext(title, side = side.title, cex = cex.title)
       }
     }
   }
-  
+
   return(invisible(pal))
 }
 
 
 make_pal <- function(col, ncol = NULL, data = NULL, range = NULL, 
-                     breaks = NULL, swap = TRUE, symmetric = TRUE) 
+  breaks = NULL, swap = TRUE, symmetric = TRUE) 
 {
   if(is.null(symmetric))
     symmetric <- TRUE
@@ -1098,13 +1098,13 @@ make_pal <- function(col, ncol = NULL, data = NULL, range = NULL,
   if(is.matrix(data)) {
     obs2col <- function(x) {
       hgt <- (x[-1L, -1L] + x[-1L, -(ncol(x) - 1L)] + 
-                x[-(nrow(x) -1L), -1L] + x[-(nrow(x) -1L), -(ncol(x) - 1L)])/4
+        x[-(nrow(x) -1L), -1L] + x[-(nrow(x) -1L), -(ncol(x) - 1L)])/4
       c(col[1L], col, col[ncol])[cut(hgt, c(-Inf, breaks, Inf))]
-    }
+      }
   } else {
     obs2col <- function(x) c(col[1L], col, col[ncol])[cut(x, c(-Inf, breaks, Inf))]
   }
-  
+
   return(list(colors = col, breaks = breaks, map = obs2col))
 }
 
@@ -1157,7 +1157,7 @@ dopos <- function(pos, limits, width, height, side.legend, shift)
     xlim <- c(min(limits[[1L]], na.rm = TRUE), min(limits[[1L]], na.rm = TRUE) + width) + mx
     ylim <- c(min(limits[[2L]], na.rm = TRUE), min(limits[[2L]], na.rm = TRUE) + height) + my
   }
-  
+
   return(list(xlim = xlim, ylim = ylim))
 }
 
@@ -1203,11 +1203,11 @@ table2df <- function(x)
 
 
 plotmap <- function(map, x = NA, id = NULL, select = NULL,
-                    legend = TRUE, names = FALSE, values = FALSE, ...)
+  legend = TRUE, names = FALSE, values = FALSE, ...)
 {
   if(inherits(map, "bnd") | inherits(map, "list"))
     map <- list2sp(map)
-  
+
   if(!is.null(id) & inherits(x, "table")) {
     if(length(id) == 1L) {
       x <- data.frame(as.numeric(x), names(x), stringsAsFactors = FALSE)
@@ -1215,7 +1215,7 @@ plotmap <- function(map, x = NA, id = NULL, select = NULL,
       select <- "plotmap_values"
     }
   }
-  
+
   if(!inherits(map, "SpatialPolygons"))
     stop("please supply a 'SpatialPolygons' object to argument map!")
   if(!inherits(map, "SpatialPolygonsDataFrame"))
@@ -1276,14 +1276,14 @@ plotmap <- function(map, x = NA, id = NULL, select = NULL,
           }
         }
       }
-      
+
       select <- "x"
     }
   }
-  
+
   nm <- names(map)
   args <- list(...)
-  
+
   if((((length(nm)) < 2 & (nm[1] == "dummy")) | is.null(x)) & is.null(select)) {
     id <- as.character(1:nrow(map@data))
     plot(map, ...)
@@ -1295,7 +1295,7 @@ plotmap <- function(map, x = NA, id = NULL, select = NULL,
       select <- nm[select]
     }
     map@data[[select[1]]] <- as.numeric(map@data[[select[1]]])
-    
+
     if(is.null(args$color))
       args$color <- heat_hcl
     if(is.null(args$symmetric))
@@ -1318,29 +1318,29 @@ plotmap <- function(map, x = NA, id = NULL, select = NULL,
       args$border <- 1
     if(is.null(args$lwd))
       args$lwd <- 1
-    
+
     args$x <- map@data[[select[1]]]
     args$plot <- FALSE
     pal <- do.call("colorlegend", delete.args("colorlegend", args))
-    
+
     plot(map, col = pal$map(map@data[[select[1]]]), border = args$border, add = args$add,
-         xlim = args$xlim, ylim = args$ylim, xpd = args$xpd, density = args$density,
-         angle = args$angle, pbg = args$pbg, axes = args$axes, lty = args$lty,
-         lwd = args$lwd, xlab = args$xlab, ylab = args$ylab, main = args$main)
-    
+      xlim = args$xlim, ylim = args$ylim, xpd = args$xpd, density = args$density,
+      angle = args$angle, pbg = args$pbg, axes = args$axes, lty = args$lty,
+      lwd = args$lwd, xlab = args$xlab, ylab = args$ylab, main = args$main)
+
     if(legend) {
       args$add <- TRUE
       pal <- do.call("colorlegend", delete.args("colorlegend", args))
     }
-    
+
     if(values) {
       co <- coordinates(map)
       text(co[, 1], co[, 2],
-           as.character(round(map@data[[select[1]]], digits = args$digits)),
-           cex = args$cex)
+        as.character(round(map@data[[select[1]]], digits = args$digits)),
+        cex = args$cex)
     }
   }
-  
+
   if(names) {
     co <- coordinates(map)
     if(is.null(args$names_id)) {
@@ -1355,11 +1355,11 @@ plotmap <- function(map, x = NA, id = NULL, select = NULL,
 
 
 .plotmap <- function(map, x = NULL, id = NULL, c.select = NULL, legend = TRUE,
-                     missing = TRUE, swap = FALSE, range = NULL, names = FALSE, values = FALSE, col = NULL,
-                     ncol = 100, breaks = NULL, cex.legend = 1, cex.names = 1, cex.values = cex.names,
-                     digits = 2L, mar.min = 2, add = FALSE, interp = FALSE, grid = 200, land.only = FALSE,
-                     extrap = FALSE, outside = FALSE, type = "akima", linear = FALSE, k = 40,
-                     p.pch = 15, p.cex = 1, shift = NULL, trans = NULL, scheme = 1, ...)
+  missing = TRUE, swap = FALSE, range = NULL, names = FALSE, values = FALSE, col = NULL,
+  ncol = 100, breaks = NULL, cex.legend = 1, cex.names = 1, cex.values = cex.names,
+  digits = 2L, mar.min = 2, add = FALSE, interp = FALSE, grid = 200, land.only = FALSE,
+  extrap = FALSE, outside = FALSE, type = "akima", linear = FALSE, k = 40,
+  p.pch = 15, p.cex = 1, shift = NULL, trans = NULL, scheme = 1, ...)
 {
   if(missing(map))
     stop("map object is missing!")
@@ -1395,8 +1395,8 @@ plotmap <- function(map, x = NA, id = NULL, select = NULL,
     for(i in upn) {
       j <- poly.names == i
       poly.names[j] <- paste(poly.names[j],
-                             if(sum(j) > 1) paste(".", 1:sum(j), sep = "") else NULL,
-                             sep = "")
+        if(sum(j) > 1) paste(".", 1:sum(j), sep = "") else NULL,
+        sep = "")
     }
     names(map) <- poly.names
   }
@@ -1432,8 +1432,8 @@ plotmap <- function(map, x = NA, id = NULL, select = NULL,
       x$x <- trans(x$x)
     }
     map_fun <- make_pal(col = col, ncol = ncol, data = as.numeric(x$x), 
-                        range = range, breaks = breaks, swap = swap, 
-                        symmetric = symmetric)$map
+      range = range, breaks = breaks, swap = swap, 
+      symmetric = symmetric)$map
     colors <- map_fun(as.numeric(x$x))
   } else {
     if(is.null(col))
@@ -1476,18 +1476,18 @@ plotmap <- function(map, x = NA, id = NULL, select = NULL,
     cdata <- data.frame(centroids(map), "id" = names(map))
     cdata <- merge(cdata, data.frame("z" = x$x, "id" = x$id), by = "id")
     cdata <- unique(cdata)
-    
+
     xo <- seq(map.limits$x[1], map.limits$x[2], length = grid)
     yo <- seq(map.limits$y[1], map.limits$y[2], length = grid)
     ico <- interp2(x = cdata[["x"]], y = cdata[["y"]], z = cdata[["z"]],
-                   xo = xo,
-                   yo = yo,
-                   type = type, linear = linear, extrap = extrap,
-                   k = if(is.null(k)) ceiling(length(map) * 0.8) else as.integer(k))
+      xo = xo,
+      yo = yo,
+      type = type, linear = linear, extrap = extrap,
+      k = if(is.null(k)) ceiling(length(map) * 0.8) else as.integer(k))
     
     yco <- rep(yo, each = length(xo))
     xco <- rep(xo, length(yo))
-    
+
     d4x <- abs(diff(xco))
     d4x <- min(d4x[d4x != 0], na.rm = TRUE)
     d4y <- abs(diff(yco))
@@ -1496,18 +1496,18 @@ plotmap <- function(map, x = NA, id = NULL, select = NULL,
     pp <- NULL
     if(length(res))
       pp <- cbind(xco, yco)
-    
+
     cvals <- as.numeric(ico)
     cvals[cvals < min(cdata$z)] <- min(cdata$z)
     cvals[cvals > max(cdata$z)] <- max(cdata$z)
     icolors <- map_fun(cvals)
-    
+
     if(!outside) {
       maptools::gpclibPermit()
       class(map) <- "bnd"
       mapsp <- list2sp(map)
       ob <- maptools::unionSpatialPolygons(mapsp, rep(1L, length = length(mapsp)), avoidGEOS  = TRUE)
-      
+
       nob <- length(slot(slot(ob, "polygons")[[1]], "Polygons"))
       pip <- NULL
       for(j in 1:nob) {
@@ -1515,17 +1515,17 @@ plotmap <- function(map, x = NA, id = NULL, select = NULL,
         pip <- cbind(pip, point.in.polygon(xco, yco, oco[, 1L], oco[, 2L], mode.checked = FALSE) < 1L)
       }
       pip <- apply(pip, 1, function(x) { x < 1 })
-      
+    
       icolors[pip] <- NA
     }
-    
+
     if(land.only) {
       icolors[is.na(maps::map.where("world", xco, yco))] <- NA
     }
-    
+
     if(length(res)) {
-      rect(pp[, 1] - res[1] / 2, pp[, 2] - res[2] / 2, pp[, 1] + res[1] / 2, pp[, 2] + res[2] / 2,
-           col = icolors, border = NA, lwd = 0)
+     rect(pp[, 1] - res[1] / 2, pp[, 2] - res[2] / 2, pp[, 1] + res[1] / 2, pp[, 2] + res[2] / 2,
+       col = icolors, border = NA, lwd = 0)
     } else {
       points(SpatialPoints(cbind(xco, yco)), col = icolors, pch = p.pch, cex = p.cex)
     }
@@ -1547,7 +1547,7 @@ plotmap <- function(map, x = NA, id = NULL, select = NULL,
   angle.p <- if(!is.null(args$angle)) rep(args$angle, length.out = n) else NULL
   if(is.null(angle.p))
     angle.p <- rep(90, length.out = n)
-  
+
   for(poly in unique(poly.names.orig)) {
     for(i in which(poly.names.orig == poly)) {
       args$x <- map[[i]][, 1L]
@@ -1570,8 +1570,8 @@ plotmap <- function(map, x = NA, id = NULL, select = NULL,
         }
       } else args$col <- colors[i]
       do.call(graphics::polygon, 
-              delete.args(graphics::polygon, args, 
-                          c("lwd", "cex", "lty")))
+        delete.args(graphics::polygon, args, 
+        c("lwd", "cex", "lty")))
       if(names && !values) {
         args$polygon <- map[[i]]
         args$poly.name <- poly.names.orig[i]
@@ -1588,7 +1588,7 @@ plotmap <- function(map, x = NA, id = NULL, select = NULL,
       }
     }
   }
-  
+
   if(legend) {
     if(is.null(args$pos))
       args$pos <- "topleft"
@@ -1633,7 +1633,7 @@ plotmap <- function(map, x = NA, id = NULL, select = NULL,
     mtext(args$xlab, side = 1L)
   if(!is.null(args$ylab))
     mtext(args$ylab, side = 2L)
-  
+
   return(invisible(NULL))
 }
 
@@ -1695,7 +1695,7 @@ compute.x.id <- function(x, id = NULL, c.select = NULL, range = NULL, symmetric 
     }
     if(is.null(c.select)) {
       take <- c("mean", "Mean", "MEAN", "estimate", 
-                "Estimate", "ESTIMATE", "mean", "pmode", "pmean_tot")
+        "Estimate", "ESTIMATE", "mean", "pmode", "pmean_tot")
       did.take <- FALSE
       for(k in take) {
         if(!is.na(pmatch(k, nx)) & !did.take) {
@@ -1703,14 +1703,14 @@ compute.x.id <- function(x, id = NULL, c.select = NULL, range = NULL, symmetric 
           did.take <- TRUE
         }
       }
-      if(!did.take && length(x) > 1L)
-        x <- x[[2L]]
+     if(!did.take && length(x) > 1L)
+       x <- x[[2L]]
     } else {
       if(is.character(c.select)) {
         k <- pmatch(c.select, nx)
-        if(is.na(k))
-          stop("argument c.select is specified wrong!")
-        x <- x[[k]]
+      if(is.na(k))
+        stop("argument c.select is specified wrong!")
+      x <- x[[k]]
       } else {
         if(c.select > length(nx))
           stop("argument c.select is specified wrong!")
@@ -1742,7 +1742,7 @@ compute.x.id <- function(x, id = NULL, c.select = NULL, range = NULL, symmetric 
       } else x[x < min(range)] <- min(range)
     }
   }
-  
+
   return(list(id = as.character(id), x = x, range = xrange))
 }
 
@@ -1761,8 +1761,8 @@ df2m <- function(x)
       if(all(nxa[k] != c("dim", "dimnames", "class", "names", "row.names"))) {
         attr(x, nxa[k]) <- xattr[[k]]
       }
-  }
-  
+    }
+
   return(x)
 }
 
@@ -1797,7 +1797,7 @@ find.limits <- function(map, mar.min = 2, ...)
       }
     }
   }
-  
+
   return(list(ylim = ylim, xlim = xlim, mar = mar, asp = asp))
 }
 
@@ -1823,43 +1823,43 @@ set.plot2d.specs <- function(nc, args, col.lines, is.bayesx)
   args$lty <- lty
   args$lwd <- lwd
   args$col.lines <- col.lines
-  
+
   return(args)
 }
 
 
 interp2 <- function(x, y, z, xo = NULL, yo = NULL, grid = 30,
-                    type = c("mba", "akima", "mgcv", "gam", "raw"), linear = FALSE, extrap = FALSE, k = 40)
+  type = c("mba", "akima", "mgcv", "gam", "raw"), linear = FALSE, extrap = FALSE, k = 40)
 {
   type <- tolower(type)
   type <- match.arg(type)
-  
+
   if(is.null(xo))
     xo <- seq(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length = grid)
   if(is.null(yo))
     yo <- seq(min(y, na.rm = TRUE), max(y, na.rm = TRUE), length = grid)
-  
+
   xgrid <- length(xo)
   ygrid <- length(yo)
   x <- as.numeric(x); y <- as.numeric(y); z <- as.numeric(z)
-  
+
   if(type %in% c("mgcv", "gam")) {
     xo <- as.numeric(xo); yo <- as.numeric(yo)
     xr <- range(x, na.rm = TRUE)
     yr <- range(y, na.rm = TRUE)
     x <- (x - xr[1]) / diff(xr)
     y <- (y - yr[1]) / diff(yr)
-    
+
     if(k > length(z))
       k <- ceiling(0.8 * length(z))
-    
+
     b <- mgcv::gam(z ~ s(x, y, k = k))
-    
+
     x2 <- (xo - xr[1]) / diff(xr)
     y2 <- (yo - yr[1]) / diff(yr)
     nd <- data.frame("x" = rep(x2, ygrid), "y" = rep(y2, rep(xgrid, xgrid)))
     fit <- as.vector(predict(b, newdata = nd))
-    
+
     if(!extrap) {
       pid <- chull(X <- cbind(x, y))
       pol <- X[c(pid, pid[1]), ]
@@ -1878,21 +1878,21 @@ interp2 <- function(x, y, z, xo = NULL, yo = NULL, grid = 30,
         cat("NOTE: Package 'akima' has an ACM license that restricts applications to non-commercial usage.\n")
       } else {
         stop(paste("plot3d() can only be used if the 'akima' package is installed. ",
-                   "Note that 'akima' has an ACM license that restricts applications to ",
-                   "non-commercial usage.", sep = ""))
+          "Note that 'akima' has an ACM license that restricts applications to ",
+          "non-commercial usage.", sep = ""))
       }
     }
-    
+
     fit <- try(akima::interp(x, y, z, xo = xo, yo = yo, 
-                             duplicate = "mean", linear = linear, extrap = extrap)$z, silent = TRUE)
+      duplicate = "mean", linear = linear, extrap = extrap)$z, silent = TRUE)
     if(inherits(fit, "try-error") | all(is.na(fit))) {
       cat("NOTE: akima::interp() is designed for irregular data points, the coordinates will be slightly jittered to obtain irregular spaced points.\n")
       fit <- try(akima::interp(jitter(x, amount = .Machine$double.eps),
-                               jitter(y, amount = .Machine$double.eps), z, xo = xo, yo = yo, 
-                               duplicate = "mean", linear = linear, extrap = extrap)$z, silent = TRUE)
+        jitter(y, amount = .Machine$double.eps), z, xo = xo, yo = yo, 
+        duplicate = "mean", linear = linear, extrap = extrap)$z, silent = TRUE)
     }
   }
-  
+
   return(matrix(fit, xgrid, ygrid))
 }
 
@@ -1908,10 +1908,10 @@ x2int <- function(x)
 
 
 sliceplot <- function(x, y = NULL, z = NULL, view = 1, c.select = NULL,
-                      values = NULL, probs = c(0.1, 0.5, 0.9), grid = 100,
-                      legend = TRUE, pos = "topright", digits = 2, data = NULL,
-                      rawdata = FALSE, type = "mba", linear = FALSE, extrap = FALSE,
-                      k = 40, rug = TRUE, rug.col = NULL, jitter = TRUE, ...)
+  values = NULL, probs = c(0.1, 0.5, 0.9), grid = 100,
+  legend = TRUE, pos = "topright", digits = 2, data = NULL,
+  rawdata = FALSE, type = "mba", linear = FALSE, extrap = FALSE,
+  k = 40, rug = TRUE, rug.col = NULL, jitter = TRUE, ...)
 {
   if(is.vector(x) & is.vector(y) & is.vector(z)) {
     nx <- c(
@@ -1928,13 +1928,13 @@ sliceplot <- function(x, y = NULL, z = NULL, view = 1, c.select = NULL,
       else
         if(is.matrix(data))
           data <- as.data.frame(data)
-        x <- model.frame(x, data = data)
-        if(ncol(x) < 3L)
-          stop("formula is specified wrong!")
-        if(ncol(x) > 3L)
-          x <- x[, c(2L, 3L, 1L, 4L:ncol(x))]
-        else
-          x <- x[, c(2L, 3L, 1L)]
+      x <- model.frame(x, data = data)
+      if(ncol(x) < 3L)
+        stop("formula is specified wrong!")
+      if(ncol(x) > 3L)
+        x <- x[, c(2L, 3L, 1L, 4L:ncol(x))]
+      else
+        x <- x[, c(2L, 3L, 1L)]
     }
   }
   stopifnot(is.matrix(x) || is.data.frame(x))
@@ -1957,9 +1957,9 @@ sliceplot <- function(x, y = NULL, z = NULL, view = 1, c.select = NULL,
     xo <- seq(min(x[, view]), max(x[, view]), length = grid)
     yo <- seq(min(x[, noview]), max(x[, noview]), length = grid)
     zi <- interp2(x[, view], x[, noview], x[, c.select],
-                  xo = xo,
-                  yo = yo,
-                  type = type, linear = linear, extrap = extrap, k = k)
+      xo = xo,
+      yo = yo,
+      type = type, linear = linear, extrap = extrap, k = k)
     yg <- rep(yo, each = grid)
     zg <- as.vector(zi)
     slices <- xo

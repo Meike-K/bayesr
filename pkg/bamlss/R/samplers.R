@@ -14,26 +14,26 @@
 
 
 GMCMC <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
-                  n.iter = 1200, burnin = 200, thin = 1, verbose = TRUE, step = 20,
-                  propose = "iwlsC_gp", chains = NULL, ...)
+  n.iter = 1200, burnin = 200, thin = 1, verbose = TRUE, step = 20,
+  propose = "iwlsC_gp", chains = NULL, ...)
 {
   nx <- family$names
   if(!all(nx %in% names(x)))
     stop("parameter names mismatch with family names!")
   np <- length(nx)
-  
+
   if(is.null(attr(x, "bamlss.engine.setup")))
     x <- bamlss.engine.setup(x, propose = propose, ...)
-  
+
   nobs <- nrow(y)
   if(is.data.frame(y)) {
     if(ncol(y) < 2)
       y <- y[[1]]
   }
-  
+
   if(!is.null(start))
     x <- set.starting.values(x, start)
-  
+
   if(is.character(propose)) {
     propose <- if(grepl("GMCMC", propose, fixed = TRUE)) {
       get(propose)
@@ -41,7 +41,7 @@ GMCMC <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
       get(paste("GMCMC", propose, sep = "_"))
     }
   }
-  
+
   theta <- propose2 <- fitfun <- list()
   for(i in nx) {
     theta[[i]] <- propose2[[i]] <- fitfun[[i]] <- list()
@@ -69,39 +69,39 @@ GMCMC <- function(x, y, family, start = NULL, weights = NULL, offset = NULL,
         attr(p, "fitted.values")
       }
       x[[i]][[j]]$penaltyFunction <- as.integer(sapply(x[[i]][[j]]$S, is.function))
-      #      if(!is.null(x[[i]][[j]]$sparse.setup$block.index)) {
-      #        propose2[[i]][[j]] <- GMCMC_iwls
-      #      }
+#      if(!is.null(x[[i]][[j]]$sparse.setup$block.index)) {
+#        propose2[[i]][[j]] <- GMCMC_iwls
+#      }
     }
     names(theta[[i]]) <- names(propose2[[i]]) <- names(fitfun[[i]]) <- names(x[[i]]) <- nt
   }
-  
+
   logLik <- function(eta) {
     family$loglik(y, family$map2par(eta))
   }
-  
+
   zworking <- as.numeric(rep(0, length = nobs))
   resids <- as.numeric(rep(0, length = nobs))
   if(!is.null(weights))
     weights <- as.data.frame(weights)
   if(!is.null(offset))
     offset <- as.data.frame(offset)
-  
+
   samps <- gmcmc(fun = family, theta = theta, fitfun = fitfun, data = x,
-                 propose = propose2, logLik = logLik, n.iter = n.iter, burnin = burnin, thin = thin,
-                 y = y, simplify = FALSE, zworking = zworking, resids = resids,
-                 cores = 1, chains = chains, combine = FALSE, weights = weights, offset = offset,
-                 verbose = verbose, step = step, ...)
-  
+    propose = propose2, logLik = logLik, n.iter = n.iter, burnin = burnin, thin = thin,
+    y = y, simplify = FALSE, zworking = zworking, resids = resids,
+    cores = 1, chains = chains, combine = FALSE, weights = weights, offset = offset,
+    verbose = verbose, step = step, ...)
+
   samps
 }
 
 
 gmcmc <- function(fun, theta, priors = NULL, propose = NULL,
-                  fitfun = NULL, logLik = NULL, data = NULL, attr.copy = "hess",
-                  n.iter = 12000, burnin = 2000, thin = 10, verbose = TRUE, step = 20,
-                  simplify = TRUE, chains = NULL, cores = NULL,
-                  combine = TRUE, sleep = 1, ...)
+  fitfun = NULL, logLik = NULL, data = NULL, attr.copy = "hess",
+  n.iter = 12000, burnin = 2000, thin = 10, verbose = TRUE, step = 20,
+  simplify = TRUE, chains = NULL, cores = NULL,
+  combine = TRUE, sleep = 1, ...)
 {
   if(!is.list(theta)) {
     theta <- list(theta)
@@ -124,7 +124,7 @@ gmcmc <- function(fun, theta, priors = NULL, propose = NULL,
     }
   }
   class(theta) <- c("gmcmc.theta", "list")
-  
+
   parse_input <- function(input = NULL, default, type) {
     ninput <- deparse(substitute(input), backtick = TRUE, width.cutoff = 500)
     if(is.null(input))
@@ -147,7 +147,7 @@ gmcmc <- function(fun, theta, priors = NULL, propose = NULL,
           for(j in names(input[[i]])) {
             if(!inherits(input[[i]][[j]], type)) {
               stop(paste("the '", ninput, "' object for block [", i, "][", j,
-                         "] is not a ", type,"!", sep = ""), call. = FALSE)
+                "] is not a ", type,"!", sep = ""), call. = FALSE)
             }
           }
         }
@@ -155,14 +155,14 @@ gmcmc <- function(fun, theta, priors = NULL, propose = NULL,
         if(type != "NA") {
           if(!inherits(input[[i]], type)) {
             stop(paste("the '", ninput, "' object for block [", i,
-                       "] is not a ", type,"!", sep = ""), call. = FALSE)
+              "] is not a ", type,"!", sep = ""), call. = FALSE)
           }
         }
       }
     }
     return(input)
   }
-  
+
   if(is.null(fitfun)) {
     fitfun <- function(x, p) {
       if(is.null(x)) {
@@ -170,21 +170,21 @@ gmcmc <- function(fun, theta, priors = NULL, propose = NULL,
       } else return(drop(x %*% p))
     }
   }
-  
+
   propose <- parse_input(propose, gmcmc_mvnorm, "function")
   fitfun <- parse_input(fitfun, NULL, "function")
   if(!is.null(data))
     data <- parse_input(data, NULL, "NA")
   if(!is.null(priors))
     priors <- parse_input(priors, NULL, "function")
-  
+
   if(burnin < 1) burnin <- 1
   if(burnin > n.iter) burnin <- floor(n.iter * 0.1)
   if(thin < 1)
     thin <- 1
   thin <- as.integer(thin)
   iterthin <- as.integer(seq(burnin, n.iter, by = thin))
-  
+
   rho <- new.env()
   theta.save <- vector(mode = "list", length = length(theta))
   names(theta.save) <- names(theta)
@@ -198,31 +198,31 @@ gmcmc <- function(fun, theta, priors = NULL, propose = NULL,
       eta[[i]] <- eta[[i]] + fitfun[[i]](data[[i]], theta[[i]])
     }
   }
-  
+
   for(i in ntheta) {
     if(is.list(theta[[i]])) {
       theta.save[[i]] <- vector(mode = "list", length = length(theta[[i]]))
       names(theta.save[[i]]) <- names(theta[[i]])
       for(j in names(theta[[i]])) {
         p0 <- propose[[i]][[j]](fun, theta, id = c(i, j),
-                                prior = priors[[i]][[j]], data = data[[i]][[j]], eta = eta,
-                                iteration = 1, n.iter = n.iter, burnin = burnin, rho = rho, ...)
+          prior = priors[[i]][[j]], data = data[[i]][[j]], eta = eta,
+          iteration = 1, n.iter = n.iter, burnin = burnin, rho = rho, ...)
         if(!is.list(p0)) {
           stop(paste("the propose() function for block [", i, "][", j,
-                     "] must return a named list()!", sep = ""))
+            "] must return a named list()!", sep = ""))
         }
         if(is.null(p0$alpha)) {
           stop(paste("the propose() function for block [", i, "][", j,
-                     "] must return the acceptance probability 'alpha'!", sep = ""))
+            "] must return the acceptance probability 'alpha'!", sep = ""))
         }
         if(is.null(p0$parameters)) {
           stop(paste("the propose() function for block [", i, "][", j,
-                     "] must return a vector 'parameters'!", sep = ""))
+            "] must return a vector 'parameters'!", sep = ""))
         }
         if(length(p0$parameters) != length(theta[[i]][[j]])) {
           stop(paste("the propose() function for block [", i, "][", j,
-                     "] must return a vector 'parameters' with the same length of initial parameters in theta!",
-                     sep = ""))
+            "] must return a vector 'parameters' with the same length of initial parameters in theta!",
+            sep = ""))
         }
         if(is.null(names(p0$parameters)))
           names(p0$parameters) <- paste("[", 1:length(p0$parameters), "]", sep = "")
@@ -246,24 +246,24 @@ gmcmc <- function(fun, theta, priors = NULL, propose = NULL,
       }
     } else {
       p0 <- propose[[i]](fun, theta, id = i,
-                         prior = priors[[i]], data = data[[i]], eta = eta,
-                         iteration = 1, n.iter = n.iter, burnin = burnin, rho = rho, ...)
+        prior = priors[[i]], data = data[[i]], eta = eta,
+        iteration = 1, n.iter = n.iter, burnin = burnin, rho = rho, ...)
       if(!is.list(p0)) {
         stop(paste("the propose() function for block [", i,
-                   "] must return a named list()!", sep = ""))
+          "] must return a named list()!", sep = ""))
       }
       if(is.null(p0$alpha)) {
         stop(paste("the propose() function for block [", i,
-                   "] must return the acceptance probability 'alpha'!", sep = ""))
+          "] must return the acceptance probability 'alpha'!", sep = ""))
       }
       if(is.null(p0$parameters)) {
         stop(paste("the propose() function for block [", i,
-                   "] must return a vector 'parameters'!", sep = ""))
+          "] must return a vector 'parameters'!", sep = ""))
       }
       if(length(p0$parameters) != length(theta[[i]])) {
         stop(paste("the propose() function for block [", i,
-                   "] must return a vector 'parameters' with the same length of initial parameters in theta!",
-                   sep = ""))
+          "] must return a vector 'parameters' with the same length of initial parameters in theta!",
+          sep = ""))
       }
       if(is.null(names(p0$parameters)))
         names(p0$parameters) <- paste("[", 1:length(p0$parameters), "]", sep = "")
@@ -286,12 +286,12 @@ gmcmc <- function(fun, theta, priors = NULL, propose = NULL,
       }
     }
   }
-  
+
   ll <- rep(NA, length = length(iterthin))
-  
+
   nstep <- step
   step <- floor(n.iter / step)
-  
+
   sampler <- function(...) {
     if(verbose) {
       cat2("Starting the sampler...")
@@ -307,18 +307,18 @@ gmcmc <- function(fun, theta, priors = NULL, propose = NULL,
           for(j in names(theta[[i]])) {
             ## Get proposed states.
             state <- propose[[i]][[j]](fun, theta, id = c(i, j),
-                                       prior = priors[[i]][[j]], data = data[[i]][[j]], eta = eta,
-                                       iteration = iter, n.iter = n.iter, burnin = burnin, rho = rho, ...)
-            
+              prior = priors[[i]][[j]], data = data[[i]][[j]], eta = eta,
+              iteration = iter, n.iter = n.iter, burnin = burnin, rho = rho, ...)
+
             ## If accepted, set current state to proposed state.
             accepted <- if(is.na(state$alpha)) FALSE else log(runif(1)) <= state$alpha
-            
+
             if(accepted) {
               eta[[i]] <- eta[[i]] - fitfun[[i]][[j]](data[[i]][[j]], theta[[i]][[j]])
               theta[[i]][[j]] <- state$parameters
               eta[[i]] <- eta[[i]] + fitfun[[i]][[j]](data[[i]][[j]], theta[[i]][[j]])
             }
-            
+
             ## Save the samples.
             if(save) {
               theta.save[[i]][[j]]$samples[js, ] <- theta[[i]][[j]]
@@ -335,18 +335,18 @@ gmcmc <- function(fun, theta, priors = NULL, propose = NULL,
         } else {
           ## Get proposed states.
           state <- propose[[i]](fun, theta, id = i,
-                                prior = priors[[i]], data = data[[i]], eta = eta,
-                                iteration = iter, n.iter = n.iter, burnin = burnin, rho = rho, ...)
-          
+            prior = priors[[i]], data = data[[i]], eta = eta,
+            iteration = iter, n.iter = n.iter, burnin = burnin, rho = rho, ...)
+
           ## If accepted, set current state to proposed state.
           accepted <- if(is.na(state$alpha)) FALSE else log(runif(1)) <= state$alpha
-          
+
           if(accepted) {
             eta[[i]] <- eta[[i]] - fitfun[[i]](data[[i]], theta[[i]])
             theta[[i]] <- state$parameters
             eta[[i]] <- eta[[i]] + fitfun[[i]](data[[i]], theta[[i]])
           }
-          
+
           ## Save the samples.
           if(save) {
             theta.save[[i]]$samples[js, ] <- theta[[i]]
@@ -361,12 +361,12 @@ gmcmc <- function(fun, theta, priors = NULL, propose = NULL,
           }
         }
       }
-      
+
       if(verbose) barfun(ptm, n.iter, iter, step, nstep)
     }
-    
+
     if(verbose) cat("\n")
-    
+
     for(i in ntheta) {
       theta.save[[i]] <- if(is.list(theta[[i]])) {
         lapply(theta.save[[i]], function(x) { do.call("cbind", x) })
@@ -390,8 +390,8 @@ gmcmc <- function(fun, theta, priors = NULL, propose = NULL,
         sep <- c(".", "")[as.integer(grepl("[", cn, fixed = TRUE)) + 1L]
         for(j in seq_along(cn)) {
           cn[j] <- paste(if(length(theta) > 1) i else NULL,
-                         if(length(theta[[i]]) > 1) cn[j] else NULL,
-                         sep = if(length(theta) > 1) sep[j] else "")
+            if(length(theta[[i]]) > 1) cn[j] else NULL,
+            sep = if(length(theta) > 1) sep[j] else "")
         }
         colnames(theta.save[[i]]) <- cn
       }
@@ -403,13 +403,13 @@ gmcmc <- function(fun, theta, priors = NULL, propose = NULL,
     }
     theta.save <- if(length(theta.save) < 2) theta.save[[1]] else do.call("cbind", theta.save)
     theta.save <- cbind(theta.save, "logLik" = ll)
-    
+
     theta.save <- mcmc(theta.save, start = burnin, end = n.iter, thin = thin)
     class(theta.save) <- c("gmcmc", class(theta.save))
-    
+
     return(theta.save)
   }
-  
+
   sampling <- function(chains, ...) {
     if(is.null(chains))  chains <- 1
     if(chains < 2) {
@@ -422,7 +422,7 @@ gmcmc <- function(fun, theta, priors = NULL, propose = NULL,
       return(samps)
     }
   }
-  
+
   if(is.null(cores)) cores <- 1
   if(cores < 2) {
     rval <- sampling(chains, ...)
@@ -462,8 +462,8 @@ barfun <- function(ptm, n.iter, i, step, nstep, start = TRUE)
     cat(if(ia) "\r" else "\n")
     p <- i / n.iter
     p <- paste("|", paste(rep("*", round(nstep * p)), collapse = ""),
-               paste(rep(" ", round(nstep * (1 - p))), collapse = ""), "| ",
-               formatC(round(p, 2) * 100, width = 3), "%", sep = "")
+      paste(rep(" ", round(nstep * (1 - p))), collapse = ""), "| ",
+      formatC(round(p, 2) * 100, width = 3), "%", sep = "")
     elapsed <- c(proc.time() - ptm)[3]
     rt <- elapsed / i * (n.iter - i)
     rt <- if(rt > 60) {
@@ -497,19 +497,6 @@ DIC.gmcmc <- function(object, ...)
   rval
 }
 
-DIC.bamlss <- function(object, ...)
-{
-  object <- list(object, ...)
-  rval <- NULL
-  for(j in seq_along(object)) {
-    stats <- samplestats(object[[j]])
-    rval <- rbind(rval, c("DIC" = stats$DIC, "pd" = stats$pd))
-  }
-  Call <- match.call()
-  row.names(rval) <- if(nrow(rval) > 1) as.character(Call[-1L])[1:nrow(rval)] else ""
-  rval
-}
-
 plot.gmcmc <- function(x, ...)
 {
   x <- na.omit(x)
@@ -536,16 +523,16 @@ gmcmc_mvnorm <- function(fun, theta, id, prior, ...)
 {
   args <- list(...)
   iteration <- args$iteration
-  
+
   if(is.null(attr(theta[id], "scale")))
     attr(theta[id], "scale") <- 1
   if(is.null(attr(theta[id], "P")))
     attr(theta[id], "sigma") <- diag(length(theta[id]))
-  
+
   if(iteration < floor(0.15 * args$n.iter)) {
     scale <- attr(theta[id], "scale")
     sigma <- attr(theta[id], "sigma")
-    
+
     k <- 1
     do <- TRUE
     while(do & k < 100) {
@@ -553,69 +540,69 @@ gmcmc_mvnorm <- function(fun, theta, id, prior, ...)
       p0 <- if(is.null(prior)) {
         sum(dnorm(theta[id], sd = 1000, log = TRUE), na.rm = TRUE)
       } else sum(do.call(prior, c(theta, args)[names(formals(prior))]), na.rm = TRUE)
-      
+
       theta[id] <- drop(mvtnorm::rmvnorm(n = 1, mean = theta[id], sigma = scale * sigma))
-      
+
       ll1 <- sum(do.call(fun, c(theta, args)[names(formals(fun))]), na.rm = TRUE)
       p1 <- if(is.null(prior)) {
         sum(dnorm(theta[id], sd = 1000, log = TRUE), na.rm = TRUE)
       } else sum(do.call(prior, c(theta, args)[names(formals(prior))]), na.rm = TRUE)
-      
+
       alpha <- drop((ll1 + p1) - (ll0 + p0))
-      
+
       if(!is.finite(alpha)) next
-      
+
       accepted <- if(is.na(alpha)) FALSE else log(runif(1)) <= alpha
-      
+
       scale <- if(alpha < log(0.23)) {
         scale - 0.1 * scale
       } else {
         scale + 0.1 * scale
       }
-      
+
       if(accepted) do <- FALSE
-      
+
       k <- k + 1
     }
-    
+
     attr(theta[id], "scale") <- scale
     attr(theta[id], "sigma") <- sigma
   }
-  
+
   scale <- attr(theta[id], "scale")
   sigma <- attr(theta[id], "sigma")
-  
+
   ll0 <- sum(do.call(fun, c(theta, args)[names(formals(fun))]), na.rm = TRUE)
   p0 <- if(is.null(prior)) {
     sum(dnorm(theta[id], sd = 1000, log = TRUE), na.rm = TRUE)
   } else sum(do.call(prior, c(theta, args)[names(formals(prior))]), na.rm = TRUE)
-  
+
   theta[id] <- drop(mvtnorm::rmvnorm(n = 1, mean = theta[id], sigma = scale * sigma))
-  
+
   ll1 <- sum(do.call(fun, c(theta, args)[names(formals(fun))]), na.rm = TRUE)
   p1 <- if(is.null(prior)) {
     sum(dnorm(theta[id], sd = 1000, log = TRUE), na.rm = TRUE)
   } else sum(do.call(prior, c(theta, args)[names(formals(prior))]), na.rm = TRUE)
-  
+
   alpha <- drop((ll1 + p1) - (ll0 + p0))
-  
+
   rval <- list("parameters" = theta[id], "alpha" = alpha)
-  
+
   attr(rval$parameters, "scale") <- scale
   attr(rval$parameters, "sigma") <- sigma
-  
+
   rval
 }
 
 
 gmcmc_unislice <- function(fun, theta, id, prior, j, ...,
-                           w = 1, m = 30, lower = -Inf, upper = +Inf)
+  w = 1, m = 30, lower = -Inf, upper = +Inf)
 {
   args <- list(...)
-  
+
   x0 <- theta[id][j]
   gL <- gR <- theta
-  
+
   fun2 <- function(theta) {
     ll <- sum(do.call(fun, c(theta, args)[names(formals(fun))]), na.rm = TRUE)
     lp <- if(is.null(prior)) {
@@ -623,18 +610,18 @@ gmcmc_unislice <- function(fun, theta, id, prior, j, ...,
     } else sum(do.call(prior, c(theta, args)[names(formals(prior))]), na.rm = TRUE)
     return(ll + lp)
   }
-  
+
   gx0 <- fun2(theta)
-  
+
   ## Determine the slice level, in log terms.
   logy <- gx0 - rexp(1)
-  
+
   ## Find the initial interval to sample from.
   ## w <- w * abs(x0) ## FIXME???
   u <- runif(1, 0, w)
   gL[id][j] <- theta[id][j] - u
   gR[id][j] <- theta[id][j] + (w - u)  ## should guarantee that g[j] is in [L, R], even with roundoff
-  
+
   ## Expand the interval until its ends are outside the slice, or until
   ## the limit on steps is reached.
   if(is.infinite(m)) {
@@ -666,7 +653,7 @@ gmcmc_unislice <- function(fun, theta, id, prior, j, ...,
       }
     }
   }
-  
+
   ## Shrink interval to lower and upper bounds.
   if(gL[id][j] < lower) {
     gL[id][j] <- lower
@@ -674,22 +661,22 @@ gmcmc_unislice <- function(fun, theta, id, prior, j, ...,
   if(gR[id][j] > upper) {
     gR[id][j] <- upper
   }
-  
+
   ## Sample from the interval, shrinking it on each rejection.
   repeat {
     theta[id][j] <- runif(1, gL[id][j], gR[id][j])
-    
+
     gx1 <- fun2(theta)
-    
+
     if(gx1 >= logy) break
-    
+
     if(theta[id][j] > x0) {
       gR[id][j] <- theta[id][j]
     } else {
       gL[id][j] <- theta[id][j]
     }
   }
-  
+
   ## Return the point sampled
   return(theta[id][j])
 }
@@ -713,44 +700,44 @@ dmvnorm_log <- function(x, mean, sigma)
 
 
 GMCMC_iwlsC <- function(family, theta, id, eta, y, data,
-                        weights = NULL, offset = NULL, zworking, resids, rho, ...)
+  weights = NULL, offset = NULL, zworking, resids, rho, ...)
 {
   if(!is.null(offset)) {
     for(j in names(offset))
       eta[[j]] <- eta[[j]] + offset[[j]]
   }
-  
+
   W <- if(is.null(weights[[id[1]]])) 1.0 else weights[[id[1]]]
   rval <- .Call("gmcmc_iwls", family, theta, id, eta, y, data,
-                zworking, resids, id[1], W, rho, PACKAGE = "bamlss")
-  
+    zworking, resids, id[1], W, rho, PACKAGE = "bamlss")
+
   ## Sample variance parameter.
   if(!data$fixed & !data$fxsp & length(data$S)) {
     if(length(data$S) > 1) {
       i <- grep("tau2", names(rval$parameters))
       for(j in i) {
         rval$parameters <- uni.slice(rval$parameters, data, family, NULL,
-                                     NULL, id[1], j, logPost = gmcmc_logPost, lower = 0, ll = rval$loglik)
+          NULL, id[1], j, logPost = gmcmc_logPost, lower = 0, ll = rval$loglik)
       }
     }
   }
-  
+
   return(list("parameters" = rval$parameters, "alpha" = rval$alpha, "extra" = c("edf" = rval$edf)))
 }
 
 
 GMCMC_iwlsC_gp <- function(family, theta, id, eta, y, data,
-                           weights = NULL, offset = NULL, zworking, resids, rho, ...)
+  weights = NULL, offset = NULL, zworking, resids, rho, ...)
 {
   if(!is.null(offset)) {
     for(j in names(offset))
       eta[[j]] <- eta[[j]] + offset[[j]]
   }
-  
+
   W <- if(is.null(weights[[id[1]]])) 1.0 else weights[[id[1]]]
   rval <- .Call("gmcmc_iwls_gp", family, theta, id, eta, y, data,
-                zworking, resids, id[1], W, data$sparse.setup$block.index, data$sparse.setup$is.diagonal, rho)
-  
+    zworking, resids, id[1], W, data$sparse.setup$block.index, data$sparse.setup$is.diagonal, rho)
+
   ## Sample variance parameter.
   if(!data$fixed & !data$fxsp & length(data$S)) {
     if((length(data$S) < 2) & (attr(data$prior, "var_prior") == "ig")) {
@@ -767,27 +754,27 @@ GMCMC_iwlsC_gp <- function(family, theta, id, eta, y, data,
       i <- grep("tau2", names(rval$parameters))
       for(j in i) {
         rval$parameters <- uni.slice(rval$parameters, data, family, NULL,
-                                     NULL, id[1], j, logPost = gmcmc_logPost, lower = 0, ll = rval$loglik)
+          NULL, id[1], j, logPost = gmcmc_logPost, lower = 0, ll = rval$loglik)
       }
     }
   }
-  
+
   return(list("parameters" = rval$parameters, "alpha" = rval$alpha, "extra" = c("edf" = rval$edf)))
 }
 
 
 GMCMC_iwlsC_gp_diag_lasso <- function(family, theta, id, eta, y, data,
-                                      weights = NULL, offset = NULL, zworking, resids, rho, ...)
+  weights = NULL, offset = NULL, zworking, resids, rho, ...)
 {
   if(!is.null(offset)) {
     for(j in names(offset))
       eta[[j]] <- eta[[j]] + offset[[j]]
   }
-  
+
   W <- if(is.null(weights[[id[1]]])) 1.0 else weights[[id[1]]]
   rval <- .Call("gmcmc_iwls_gp_diag_lasso", family, theta, id, eta, y, data,
-                zworking, resids, id[1], W, rho, PACKAGE = "bamlss")
-  
+    zworking, resids, id[1], W, rho, PACKAGE = "bamlss")
+
   ## Sample variance parameter.
   if(!data$fixed & !data$fxsp & length(data$S)) {
     if((length(data$S) < 2) & (attr(data$prior, "var_prior") == "ig")) {
@@ -804,11 +791,11 @@ GMCMC_iwlsC_gp_diag_lasso <- function(family, theta, id, eta, y, data,
       i <- grep("tau2", names(rval$parameters))
       for(j in i) {
         rval$parameters <- uni.slice(rval$parameters, data, family, NULL,
-                                     NULL, id[1], j, logPost = gmcmc_logPost, lower = 0, ll = rval$loglik)
+          NULL, id[1], j, logPost = gmcmc_logPost, lower = 0, ll = rval$loglik)
       }
     }
   }
-  
+
   return(list("parameters" = rval$parameters, "alpha" = rval$alpha, "extra" = c("edf" = rval$edf)))
 }
 
@@ -822,35 +809,35 @@ process.derivs <- function(x, is.weight = FALSE)
 GMCMC_iwls <- function(family, theta, id, eta, y, data, weights = NULL, offset = NULL, ...)
 {
   theta <- theta[[id[1]]][[id[2]]]
-  
+
   if(is.null(attr(theta, "fitted.values")))
     attr(theta, "fitted.values") <- data$fit.fun(data$X, theta)
-  
+
   if(!is.null(offset)) {
     for(j in names(offset))
       eta[[j]] <- eta[[j]] + offset[[j]]
   }
-  
+
   ## Map predictor to parameter scale.
   peta <- family$map2par(eta)
-  
+
   ## Compute weights.
   hess <- family$hess[[id[1]]](y, peta, id = id[1])
-  
+
   if(!is.null(weights[[id[1]]]))
     hess <- hess * weights[[id[1]]]
-  
+
   hess <- process.derivs(hess, is.weight = TRUE)
-  
+
   ## Score.
   score <- process.derivs(family$score[[id[1]]](y, peta, id = id[1]), is.weight = FALSE)
-  
+
   ## Compute working observations.
   z <- eta[[id[1]]] + 1 / hess * score
-  
+
   ## Compute old log likelihood and old log coefficients prior.
   pibeta <- family$loglik(y, peta)
-  
+
   ## Sample variance parameter.
   if(!data$fixed & !data$fxsp & length(data$S)) {
     if((length(data$S) < 2) & (attr(data$prior, "var_prior") == "ig")) {
@@ -867,23 +854,23 @@ GMCMC_iwls <- function(family, theta, id, eta, y, data, weights = NULL, offset =
       i <- grep("tau2", names(theta))
       for(j in i) {
         theta <- uni.slice(theta, data, family, NULL,
-                           NULL, id[1], j, logPost = gmcmc_logPost, lower = 0, ll = pibeta)
+          NULL, id[1], j, logPost = gmcmc_logPost, lower = 0, ll = pibeta)
       }
     }
   }
-  
+
   p1 <- data$prior(theta)
-  
+
   ## Compute partial predictor.
   eta2 <- eta[[id[1]]] <- eta[[id[1]]] - attr(theta, "fitted.values")
-  
+
   ## Compute reduced residuals.
   e <- z - eta2
   xbin.fun(data$binning$sorted.index, hess, e, data$weights, data$rres, data$binning$order)
-  
+
   ## Compute mean and precision.
   XWX <- do.XWX(data$X, 1 / data$weights, data$sparse.setup$matrix)
-  
+
   S <- 0
   P <- if(data$fixed) {
     if((k <- ncol(data$X)) < 2) {
@@ -897,56 +884,56 @@ GMCMC_iwls <- function(family, theta, id, eta, y, data, weights = NULL, offset =
   }
   P[P == Inf] <- 0
   M <- P %*% crossprod(data$X, data$rres)
-  
+
   ## Degrees of freedom.
   edf <- sum_diag(XWX %*% P)
-  
+
   ## Save old coefficients
   g0 <- drop(get.par(theta, "b"))
-  
+
   ## Sample new parameters.
   g <- try(drop(rmvnorm(n = 1, mean = M, sigma = P, method = "chol")), silent = TRUE)
   if(inherits(g, "try-error")) {
     return(list("parameters" = theta, "alpha" = -Inf, "extra" = c("edf" = NA)))
   }
-  
+
   ## Compute log priors.
   p2 <- data$prior(c("b" = g, get.par(theta, "tau2")))
   qbetaprop <- try(dmvnorm(g, mean = M, sigma = P, log = TRUE), silent = TRUE)
   if(inherits(qbetaprop, "try-error")) {
     return(list("parameters" = theta, "alpha" = -Inf, "extra" = c("edf" = NA)))
   }
-  
+
   ## Compute fitted values.        
   attr(theta, "fitted.values") <- data$fit.fun(data$X, g)
-  
+
   ## Set up new predictor.
   eta[[id[1]]] <- eta[[id[1]]] + attr(theta, "fitted.values")
-  
+
   ## Map predictor to parameter scale.
   peta <- family$map2par(eta)
-  
+
   ## Compute new log likelihood.
   pibetaprop <- family$loglik(y, peta)
-  
+
   ## Compute new weights
   hess <- family$hess[[id[1]]](y, peta, id = id[1])
-  
+
   if(!is.null(weights[[id[1]]]))
     hess <- hess * weights[[id[1]]]
-  
+
   hess <- process.derivs(hess, is.weight = TRUE)
-  
+
   ## New score.
   score <- process.derivs(family$score[[id[1]]](y, peta, id = id[1]), is.weight = FALSE)
-  
+
   ## New working observations.
   z <- eta[[id[1]]] + 1 / hess * score
-  
+
   ## Compute reduced residuals.
   e <- z - eta2
   xbin.fun(data$binning$sorted.index, hess, e, data$weights, data$rres, data$binning$order)
-  
+
   ## New penalty.
   S <- 0
   if(!data$fixed) {
@@ -954,10 +941,10 @@ GMCMC_iwls <- function(family, theta, id, eta, y, data, weights = NULL, offset =
     for(j in seq_along(data$S))
       S <- S + 1 / tau2[j] * if(is.function(data$S[[j]])) data$S[[j]](c(g, data$fixed.hyper)) else data$S[[j]]
   }
-  
+
   ## Compute mean and precision.
   XWX <- do.XWX(data$X, 1 / data$weights, data$sparse.setup$matrix)
-  
+
   P2 <- if(data$fixed) {
     if(k < 2) {
       1 / (XWX)
@@ -967,30 +954,30 @@ GMCMC_iwls <- function(family, theta, id, eta, y, data, weights = NULL, offset =
   }
   P2[P2 == Inf] <- 0
   M2 <- P2 %*% crossprod(data$X, data$rres)
-  
+
   ## Get the log prior.
   qbeta <- try(dmvnorm(g0, mean = M2, sigma = P2, log = TRUE), silent = TRUE)
   if(inherits(qbeta, "try-error")) {
     return(list("parameters" = theta, "alpha" = -Inf, "extra" = c("edf" = NA)))
   }
-  
+
   theta <- set.par(theta, g, "b")
   data$state$parameters <- as.numeric(theta)
   names(data$state$parameters) <- names(theta)
-  
+
   ## Compute acceptance probablity.
   alpha <- drop((pibetaprop + qbeta + p2) - (pibeta + qbetaprop + p1))
-  
-  #cat("\n-----------\n")
-  #cat("pibetaprop", pibetaprop, "\n")
-  #cat("qbeta", qbeta, "\n")
-  #cat("p2", p2, "\n")
-  #cat("pibeta", pibeta, "\n")
-  #cat("qbetaprop", qbetaprop, "\n")
-  #cat("p1", p1, "\n")
-  #cat("alpha", exp(alpha), "\n")
-  #print(data$label)
-  
+
+#cat("\n-----------\n")
+#cat("pibetaprop", pibetaprop, "\n")
+#cat("qbeta", qbeta, "\n")
+#cat("p2", p2, "\n")
+#cat("pibeta", pibeta, "\n")
+#cat("qbetaprop", qbetaprop, "\n")
+#cat("p1", p1, "\n")
+#cat("alpha", exp(alpha), "\n")
+#print(data$label)
+
   return(list("parameters" = theta, "alpha" = alpha, "extra" = c("edf" = edf)))
 }
 
@@ -998,13 +985,13 @@ GMCMC_iwls <- function(family, theta, id, eta, y, data, weights = NULL, offset =
 GMCMC_mvn <- function(family, theta, id, prior, eta, y, data, ...)
 {
   theta <- theta[[id[1]]][[id[2]]]
-  
+
   if(is.null(attr(theta, "fitted.values")))
     attr(theta, "fitted.values") <- data$fit.fun(data$X, theta)
-  
+
   ll1 <- family$loglik(y, family$map2par(eta))
   p1 <- data$prior(theta)
-  
+
   eta2 <- eta
   eta2[[id[1]]] <- eta[[id[1]]] <- eta[[id[1]]] - attr(theta, "fitted.values")
   if(!is.null(data$state)) {
@@ -1013,33 +1000,33 @@ GMCMC_mvn <- function(family, theta, id, prior, eta, y, data, ...)
     if(is.null(attr(theta, "hess"))) {
       g <- get.par(data$state$parameters, "b")
       tau2 <- if(!data$fixed) get.par(data$state$parameters, "tau2") else NULL
-      
+
       lp <- function(g) {
         eta[[id[1]]] <- eta[[id[1]]] + data$fit.fun(data$X, g)
         family$loglik(y, family$map2par(eta)) + data$prior(c(g, tau2))
       }
-      
+
       gfun <- hfun <- NULL
-      
+
       g.grad <- grad(fun = lp, theta = g, id = id[1], prior = NULL,
-                     args = list("gradient" = gfun, "x" = data, "y" = y, "eta" = eta))
-      
+        args = list("gradient" = gfun, "x" = data, "y" = y, "eta" = eta))
+
       g.hess <- hess(fun = lp, theta = g, id = id[1], prior = NULL,
-                     args = list("gradient" = gfun, "hessian" = hfun, "x" = data, "y" = y, "eta" = eta))
-      
+        args = list("gradient" = gfun, "hessian" = hfun, "x" = data, "y" = y, "eta" = eta))
+
       attr(theta, "hess") <- matrix_inv(g.hess)
     }
   }
-  
+
   g <- drop(rmvnorm(n = 1, mean = drop(get.par(theta, "b")), sigma = attr(theta, "hess")))
   theta <- set.par(theta, g, "b")
-  
+
   attr(theta, "fitted.values") <- data$fit.fun(data$X, theta)
-  
+
   eta[[id[1]]] <- eta[[id[1]]] + attr(theta, "fitted.values")
   ll2 <- family$loglik(y, family$map2par(eta))
   p2 <- data$prior(theta)
-  
+
   ## Sample variance parameter.
   if(!data$fixed & !data$fxsp & length(data$S)) {
     if(length(data$S) < 2) {
@@ -1052,17 +1039,17 @@ GMCMC_mvn <- function(family, theta, id, prior, eta, y, data, ...)
       i <- grep("tau2", names(theta))
       for(j in i) {
         theta <- uni.slice(theta, data, family, NULL,
-                           NULL, id[1], j, logPost = gmcmc_logPost, lower = 0, ll = ll1)
+          NULL, id[1], j, logPost = gmcmc_logPost, lower = 0, ll = ll1)
       }
     }
   }
-  
+
   ## Compute acceptance probablity.
   alpha <- drop((ll2 + p2) - (ll1 + p1))
-  
+
   data$state$parameters <- as.numeric(theta)
   names(data$state$parameters) <- names(theta)
-  
+
   rval <- list("parameters" = theta, "alpha" = alpha)
   rval
 }
@@ -1074,20 +1061,20 @@ GMCMC_newton <- function(family, theta, id, prior, eta, y, data, ...)
   g <- get.par(theta, "b")
   tau2 <- if(!data$fixed) get.par(theta, "tau2") else NULL
   nu <- if(is.null(data$nu)) 0.1 else data$nu
-  
+
   pibeta <- family$loglik(y, family$map2par(eta))
   p1 <- data$prior(theta)
-  
+
   if(is.null(attr(theta, "fitted.values")))
     attr(theta, "fitted.values") <- data$fit.fun(data$X, theta)
-  
+
   eta[[id[1]]] <- eta[[id[1]]] - attr(theta, "fitted.values")
-  
+
   lp <- function(g) {
     eta[[id[1]]] <- eta[[id[1]]] + data$fit.fun(data$X, g)
     family$loglik(y, family$map2par(eta)) + data$prior(c(g, tau2))
   }
-  
+
   if(is.null(family$gradient[[id[1]]])) {
     gfun <- NULL
   } else {
@@ -1100,7 +1087,7 @@ GMCMC_newton <- function(family, theta, id, prior, eta, y, data, ...)
       drop(gg)
     }
   }
-  
+
   if(is.null(family$hessian[[id[1]]])) {
     hfun <- NULL
   } else {
@@ -1113,42 +1100,42 @@ GMCMC_newton <- function(family, theta, id, prior, eta, y, data, ...)
       hg
     }
   }
-  
+
   g.grad <- grad(fun = lp, theta = g, id = id[1], prior = NULL,
-                 args = list("gradient" = gfun, "x" = data, "y" = y, "eta" = eta))
-  
+    args = list("gradient" = gfun, "x" = data, "y" = y, "eta" = eta))
+
   g.hess <- hess(fun = lp, theta = g, id = id[1], prior = NULL,
-                 args = list("gradient" = gfun, "hessian" = hfun, "x" = data, "y" = y, "eta" = eta))
-  
+    args = list("gradient" = gfun, "hessian" = hfun, "x" = data, "y" = y, "eta" = eta))
+
   Sigma <- matrix_inv(g.hess)
   mu <- drop(g + nu * Sigma %*% g.grad)
-  
+
   g2 <- drop(rmvnorm(n = 1, mean = mu, sigma = Sigma))
   names(g2) <- names(g)
-  
+
   p2 <- data$prior(c("b" = g2, tau2))
   qbetaprop <- dmvnorm(g2, mean = mu, sigma = Sigma, log = TRUE)
-  
+
   g.grad2 <- grad(fun = lp, theta = g2, id = id[1], prior = NULL,
-                  args = list("gradient" = gfun, "x" = data, "y" = y, "eta" = eta))
-  
+    args = list("gradient" = gfun, "x" = data, "y" = y, "eta" = eta))
+
   g.hess2 <- hess(fun = lp, theta = g2, id = id[1], prior = NULL,
-                  args = list("gradient" = gfun, "hessian" = hfun, "x" = data, "y" = y, "eta" = eta))
-  
+    args = list("gradient" = gfun, "hessian" = hfun, "x" = data, "y" = y, "eta" = eta))
+
   Sigma2 <- matrix_inv(g.hess2)
   mu2 <- drop(g2 + nu * Sigma2 %*% g.grad2)
-  
+
   theta <- set.par(theta, g2, "b")
-  
+
   attr(theta, "fitted.values") <- data$fit.fun(data$X, g2)
   eta[[id[1]]] <- eta[[id[1]]] + attr(theta, "fitted.values")
-  
+
   pibetaprop <- family$loglik(y, family$map2par(eta))
-  
+
   qbeta <- dmvnorm(matrix(g, nrow = 1), mean = mu2, sigma = Sigma2, log = TRUE)
-  
+
   alpha <- drop((pibetaprop + qbeta + p2) - (pibeta + qbetaprop + p1))
-  
+
   ## Sample variance parameter.
   if(!data$fixed & !data$fxsp) {
     if(!data$fixed & !data$fxsp) {
@@ -1161,10 +1148,10 @@ GMCMC_newton <- function(family, theta, id, prior, eta, y, data, ...)
       theta <- set.par(theta, tau2, "tau2")
     }
   }
-  
+
   data$state$parameters <- as.numeric(theta)
   names(data$state$parameters) <- names(theta)
-  
+
   rval <- list("parameters" = theta, "alpha" = alpha, "extra" = c("edf" = data$edf(data)))
 }
 
@@ -1176,7 +1163,7 @@ gmcmc_logPost <- function(g, x, family, y = NULL, eta = NULL, id, ll = NULL)
     ll <- family$loglik(y, family$map2par(eta))
   }
   lp <- x$prior(g)
-  
+
   return(ll + lp)
 }
 
@@ -1184,27 +1171,27 @@ gmcmc_logPost <- function(g, x, family, y = NULL, eta = NULL, id, ll = NULL)
 GMCMC_slice <- function(family, theta, id, eta, y, data, ...)
 {
   theta <- theta[[id[1]]][[id[2]]]
-  
+
   if(is.null(attr(theta, "fitted.values")))
     attr(theta, "fitted.values") <- data$fit.fun(data$X, theta)
-  
+
   ## Remove fitted values.
   eta[[id[1]]] <- eta[[id[1]]] - attr(theta, "fitted.values")
-  
+
   attr(theta, "fitted.values") <- NULL
-  
+
   ## Sample coefficients.
   i <- 1:length(theta)
   if(!data$fixed)
     i <- i[-grep("tau2", names(theta))]
   for(j in i) {
     theta <- uni.slice(theta, data, family, y,
-                       eta, id[1], j, logPost = gmcmc_logPost)
+      eta, id[1], j, logPost = gmcmc_logPost)
   }
-  
+
   ## New fitted values.
   fit <- data$fit.fun(data$X, theta)
-  
+
   ## Sample variance parameter.
   if(!data$fixed & !data$fxsp & length(data$S)) {
     ## New logLik.
@@ -1213,13 +1200,13 @@ GMCMC_slice <- function(family, theta, id, eta, y, data, ...)
     i <- grep("tau2", names(theta))
     for(j in i) {
       theta <- uni.slice(theta, data, family, NULL,
-                         NULL, id[1], j, logPost = gmcmc_logPost, lower = 0, ll = ll)
+        NULL, id[1], j, logPost = gmcmc_logPost, lower = 0, ll = ll)
     }
   }
-  
+
   ## New theta.
   attr(theta, "fitted.values") <- fit
-  
+
   return(list("parameters" = theta, "alpha" = log(1)))
 }
 
@@ -1228,12 +1215,12 @@ gmcmc_mvnorm2 <- function(fun, theta, id, prior, ...)
 {
   args <- list(...)
   iteration <- args$iteration
-  
+
   ll0 <- sum(do.call(fun, c(theta, args)[names(formals(fun))]), na.rm = TRUE)
   p0 <- if(is.null(prior)) {
     sum(dnorm(theta[id], sd = 1000, log = TRUE), na.rm = TRUE)
   } else sum(do.call(prior, c(theta, args)[names(formals(prior))]), na.rm = TRUE)
-  
+
   adapt <- if(is.null(args$adapt)) args$burnin else args$adapt 
   if(iteration <= adapt) {
     eps <- attr(theta[id], "eps")
@@ -1252,7 +1239,7 @@ gmcmc_mvnorm2 <- function(fun, theta, id, prior, ...)
       if(is.null(start))
         start <- theta[id]
       opt <- optim(start, fn = objfun, method = "L-BFGS-B", hessian = TRUE,
-                   control = list(maxit = 100))
+        control = list(maxit = 100))
       theta[id] <- opt$par
       attr(theta[id], "sigma") <- matrix_inv(diag(diag(opt$hessian)))
       attr(theta[id], "scale") <- 1
@@ -1260,25 +1247,25 @@ gmcmc_mvnorm2 <- function(fun, theta, id, prior, ...)
       attr(theta[id], "mode") <- opt$par
     }
   }
-  
+
   theta.attr <- attributes(theta[id])
-  
+
   scale <- theta.attr$scale
   sigma <- theta.attr$sigma
   sigma <- scale * sigma
-  
+
   theta[id] <- drop(rmvnorm(n = 1, mean = theta[id], sigma = sigma))
-  
+
   ll1 <- sum(do.call(fun, c(theta, args)[names(formals(fun))]), na.rm = TRUE)
   p1 <- if(is.null(prior)) {
     sum(dnorm(theta[id], sd = 1000, log = TRUE), na.rm = TRUE)
   } else sum(do.call(prior, c(theta, args)[names(formals(prior))]), na.rm = TRUE)
-  
+
   alpha <- drop((ll1 + p1) - (ll0 + p0))
-  
+
   rval <- list("parameters" = theta[id], "alpha" = alpha)
   attributes(rval$parameters) <- theta.attr
-  
+
   rval
 }
 
@@ -1407,7 +1394,7 @@ hess <- function(fun, theta, prior, id, args, diag = FALSE)
 gmcmc_newton <- function(fun, theta, id, prior, ...)
 {
   args <- list(...)
-  
+
   adapt <- if(is.null(args$adapt)) {
     if(args$burnin < 1) 1 else args$burnin
   } else args$adapt
@@ -1432,11 +1419,11 @@ gmcmc_newton <- function(fun, theta, id, prior, ...)
           -1 * do.call(gfun2, c(theta2, args)[names(formals(gfun2))])
         }
       }
-      
+
       start <- attr(theta[id], "mode")
       if(is.null(start))
         start <- theta[id]
-      
+
       opt <- optim(start, fn = objfun, gr = gfun, method = "L-BFGS-B")
       
       rval <- list("parameters" = opt$par, "alpha" = log(10))
@@ -1449,32 +1436,32 @@ gmcmc_newton <- function(fun, theta, id, prior, ...)
   } else {
     p.old <- eval_fun(fun, theta, prior, id, args)
     theta2 <- theta
-    
+
     grad.theta <- grad(fun, theta, prior, id, args)
     hess.theta <- hess(fun, theta, prior, id, args, diag = FALSE)
-    
+
     Sigma <- matrix_inv(hess.theta)
     mu <- drop(theta[id] + Sigma %*% grad.theta)
-    
+
     q.prop <- dmvnorm(matrix(theta[id], nrow = 1), mean = mu, sigma = Sigma, log = TRUE)
-    
+
     theta2[id] <- drop(rmvnorm(n = 1, mean = mu, sigma = Sigma))
-    
+
     grad.theta2 <- grad(fun, theta2, prior, id, args)
     hess.theta2 <- hess(fun, theta2, prior, id, args, diag = FALSE)
-    
+
     Sigma2 <- matrix_inv(hess.theta2)
     mu2 <- drop(theta2[id] + Sigma2 %*% grad.theta2)
-    
+
     p.prop <- eval_fun(fun, theta2, prior, id, args)
-    
+
     q.old <- dmvnorm(matrix(theta[id], nrow = 1), mean = mu2, sigma = Sigma2, log = TRUE)
-    
+
     alpha <- (p.prop - p.old) + (q.old - q.prop)
-    
+
     rval <- list("parameters" = theta2[id], "alpha" = alpha)
   }
-  
+
   rval
 }
 
@@ -1488,7 +1475,7 @@ MVNORM <- function(x, y = NULL, family = NULL, start = NULL, n.samples = 500, he
     if(inherits(x, "bamlss")) {
       if(is.null(x$hessian)) {
         hessian <- opt(x = x$x, y = x$y, family = x$family,
-                       start = start, hessian = TRUE, ...)
+          start = start, hessian = TRUE, ...)
       } else {
         hessian <- x$hessian
       }
@@ -1496,10 +1483,10 @@ MVNORM <- function(x, y = NULL, family = NULL, start = NULL, n.samples = 500, he
       hessian <- opt(x = x, y = y, family = family, start = start, hessian = TRUE, ...)
     }
   }
-  
+
   if(is.null(hessian))
     stop("need the hessian for sampling!")
-  
+
   par <- if(inherits(x, "bamlss")) {
     unlist(x$parameters)
   } else {
@@ -1509,16 +1496,16 @@ MVNORM <- function(x, y = NULL, family = NULL, start = NULL, n.samples = 500, he
     par <- start
   if(is.null(par))
     stop("need parameters for sampling!")
-  
+
   if(length(i <- grep2(c(".alpha", ".edf", ".tau2", ".accepted"), names(par), fixed = TRUE)))
     par <- par[-i]
-  
+
   npar <- names(par)
   hessian <- hessian[npar, npar]
-  
+
   samps <- rmvnorm(n.samples, mean = par, sigma = matrix_inv(-1 * hessian))
   colnames(samps) <- npar
-  
+
   as.mcmc(samps)
 }
 
@@ -1540,22 +1527,22 @@ cat2 <- function(x, sleep = 0.03) {
 
 
 uni.slice <- function(g, x, family, response, eta, id, j, ...,
-                      w = 1, m = 30, lower = -Inf, upper = +Inf, logPost)
+  w = 1, m = 30, lower = -Inf, upper = +Inf, logPost)
 {
   x0 <- g[j]
   gL <- gR <- g
-  
+
   gx0 <- logPost(g, x, family, response, eta, id, ...)
-  
+
   ## Determine the slice level, in log terms.
   logy <- gx0 - rexp(1)
-  
+
   ## Find the initial interval to sample from.
   ## w <- w * abs(x0) ## FIXME???
   u <- runif(1, 0, w)
   gL[j] <- g[j] - u
   gR[j] <- g[j] + (w - u)  ## should guarantee that g[j] is in [L, R], even with roundoff
-  
+
   ## Expand the interval until its ends are outside the slice, or until
   ## the limit on steps is reached.
   if(is.infinite(m)) {
@@ -1587,7 +1574,7 @@ uni.slice <- function(g, x, family, response, eta, id, j, ...,
       }
     }
   }
-  
+
   ## Shrink interval to lower and upper bounds.
   if(gL[j] < lower) {
     gL[j] <- lower
@@ -1595,22 +1582,22 @@ uni.slice <- function(g, x, family, response, eta, id, j, ...,
   if(gR[j] > upper) {
     gR[j] <- upper
   }
-  
+
   ## Sample from the interval, shrinking it on each rejection.
   repeat {
     g[j] <- runif(1, gL[j], gR[j])
-    
+
     gx1 <- logPost(g, x, family, response, eta, id, ...)
-    
+
     if(gx1 >= logy) break
-    
+
     if(g[j] > x0) {
       gR[j] <- g[j]
     } else {
       gL[j] <- g[j]
     }
   }
-  
+
   ## Return the point sampled
   return(g)
 }

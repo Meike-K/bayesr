@@ -1,6 +1,7 @@
 \name{n}
 \alias{n}
-\alias{boost.nnet.predict}
+\alias{smooth.construct.nn.smooth.spec}
+\alias{n.weights}
 
 \title{Neural Networks for BAMLSS}
 
@@ -13,29 +14,30 @@
 ## The neural network smooth constructor.
 n(..., k = 10)
 
-## Predict function for boosted models.
-boost.nnet.predict(object, ..., term = NULL, mstop = NULL)
+## Initialize weights.
+n.weights(nodes, k, r = NULL, s = NULL, type = c("sigmoid", "gauss"), ...)
+
+## For mgcv.
+\method{smooth.construct}{nn.smooth.spec}(object, data, knots, ...)
 }
 
 \arguments{
   \item{\dots}{For function \code{n()} a formula of the type \code{~x1+x2+x3} that specifies
     the covariates that should be modeled by the neural network. For function
     \code{boost.nnet.predict()} arguments passed to function \code{\link{predict.bamlss}}.}
-  \item{k}{The number of hidden nodes of the network. Note that one can set an argument
-    \code{split = TRUE} to split up the neural network into, e.g., \code{nsplit = 5} parts with
-    \code{k} nodes each.}
-  \item{object}{A boosted \code{"bamlss"}  object.}
-  \item{term}{Character, specifying the neural network model term for which predictions should be
-    computed.}
-  \item{mstop}{Integer, specifies the boosting iteration for which predictions should be computed.}
+  \item{k}{For function \code{n()}, the number of hidden nodes of the network. Note that one can set
+    an argument \code{split = TRUE} to split up the neural network into, e.g., \code{nsplit = 5}
+    parts with \code{k} nodes each. For function \code{nnet.weights()}, argument \code{k}
+    is the number of input variables of the network (number of covariates).}
+  \item{nodes}{Number of nodes for each layer, i.e., can also be a vector.}
+  \item{r, s}{Parameters controlling the shape of the activation functions.}
+  \item{type}{The type of activation function that should be used.}
+  \item{object, data, knots}{See \code{\link[mgcv]{smooth.construct}}.}
 }
 
 \value{
-  For function \code{n()}, similar to function \code{\link[mgcv]{s}} a simple smooth
-  specification object.
-
-  For function \code{boost.nnet.predict()} predictions as returned from function
-  \code{\link{predict.bamlss}}.
+  Function \code{n()}, similar to function \code{\link[mgcv]{s}} a simple smooth specification
+  object.
 }
 
 
@@ -49,9 +51,11 @@ set.seed(123)
 d <- GAMart()
 
 ## Estimate model.
-f <- num ~ n(x1) + n(x2) + n(x3) + n(~lon+lat)
+f <- num ~ n(x1,k=50) + n(x2,k=50) + n(x3,k=50) + n(~lon+lat,k=50,split=TRUE)
 
-b <- bamlss(f, data = d, sampler = FALSE, nu = 1)
+## Set the seed, weights are initialized randomly.
+set.seed(111)
+b <- bamlss(f, data = d, sampler = FALSE)
 
 ## Plot estimated effects.
 plot(b)
@@ -59,53 +63,27 @@ plot(b)
 ## Boosted version.
 set.seed(111)
 b <- bamlss(f, data = d, sampler = FALSE, optimizer = boost,
-  nu = 0.01, stop.criterion = "BIC")
+  nu = 0.05, maxit = 4000)
 
-## Predict effects.
-d$fx1 <- boost.nnet.predict(b,
-  model = "mu", term = "n(x1)")
-d$fx2 <- boost.nnet.predict(b,
-  model = "mu", term = "n(x2)")
-d$fx3 <- boost.nnet.predict(b,
-  model = "mu", term = "n(x3)")
-d$flonlat <- boost.nnet.predict(b,
-  model = "mu", term = "n(~lon+lat)")
+plot(b)
 
-## Plot.
-par(mfrow = c(2, 2))
-plot2d(fx1 ~ x1, data = d)
-plot2d(fx2 ~ x2, data = d)
-plot2d(fx3 ~ x3, data = d)
-plot3d(flonlat ~ lon + lat, data = d)
-
-## Second example.
+## Second example with MCMC.
 set.seed(222)
-n <- 500
+n <- 2000
 d <- data.frame("x1" = runif(n, 0, pi), "x2" = runif(n, 0, pi))
 d$y <- sin(d$x1) * sin(d$x2) + rnorm(n, sd = exp(-2 + sin(2 * d$x2)))
 
 f <- list(
-  y ~ n(~x1+x2),
+  y ~ n(~x1+x2,k=50),
   sigma ~ n(x2)
 )
 
-b <- bamlss(f, data = d, sampler = FALSE, nu = 1)
+b <- bamlss(f, data = d)
 plot(b, ask = FALSE)
 
-## Boosted version.
-set.seed(333)
-b <- bamlss(f, data = d, sampler = FALSE, optimizer = boost,
-  stop.criterion = "BIC", nu = 0.01, maxit = 1000)
-
-## Prediction.
-d$fx1x2 <- boost.nnet.predict(b,
-  model = "mu", term = "n(~x1+x2)")
-d$fx2 <- boost.nnet.predict(b,
-  model = "sigma", term = "n(x2)")
-
-par(mfrow = c(1, 2))
-plot3d(fx1x2 ~ x1 + x2, data = d)
-plot2d(fx2 ~ x2, data = d)
+## Initialize some weights.
+set.seed(111)
+n.weights(10, 3)
 }
 }
 
